@@ -19,6 +19,8 @@ export default function IntroSplash({ onFinish }) {
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden bg-ink">
+      <div className="pointer-events-none absolute h-72 w-72 rounded-full bg-maroon-bright/30 blur-[90px]" />
+      <img src="/logo.png" alt="Seven Snack" className="relative w-60 max-w-[70%] object-contain" />
       {!videoFailed && (
         <video
           className="absolute inset-0 h-full w-full object-cover"

@@ -85,7 +85,7 @@ export default function AdminReports() {
   return (
     <div className="space-y-6">
       <PageTop
-        icon={<ChartColumn size={34} className="text-[#f0222c]" />}
+        icon={<ChartColumn size={34} className="text-[#fc0000]" />}
         title={t('admin.reports.title')}
         subtitle={t('admin.reports.subtitle')}
         showBell={false}
@@ -111,7 +111,7 @@ export default function AdminReports() {
               }}
               aria-pressed={range === key}
               className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition sm:px-5 ${
-                range === key ? 'bg-[#e11d28] text-white' : 'bg-white/[0.06] text-white/75 hover:bg-white/[0.11]'
+                range === key ? 'bg-[#e00000] text-white' : 'bg-white/[0.06] text-white/75 hover:bg-white/[0.11]'
               }`}
             >
               {key === 'custom' && <Calendar size={15} />}
@@ -244,7 +244,7 @@ function Content({ data, metric, setMetric }) {
                   onClick={() => setMetric(key)}
                   aria-pressed={metric === key}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition sm:px-5 ${
-                    metric === key ? 'bg-[#d9151f] text-white' : 'text-white/55 hover:text-white'
+                    metric === key ? 'bg-[#e00000] text-white' : 'text-white/55 hover:text-white'
                   }`}
                 >
                   {label}
@@ -276,7 +276,7 @@ function Content({ data, metric, setMetric }) {
                 <li key={dish.id} className="flex items-center gap-3">
                   <span
                     className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                      index === 0 ? 'bg-[#d9151f] text-white' : 'bg-white/[0.07] text-white/70'
+                      index === 0 ? 'bg-[#e00000] text-white' : 'bg-white/[0.07] text-white/70'
                     }`}
                   >
                     {index + 1}
@@ -289,7 +289,7 @@ function Content({ data, metric, setMetric }) {
                     <div className="mt-1.5 flex items-center gap-3">
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
                         <div
-                          className={`h-full rounded-full ${index === 0 ? 'bg-[#f0222c]' : 'bg-[#a3101a]'}`}
+                          className={`h-full rounded-full ${index === 0 ? 'bg-[#fc0000]' : 'bg-[#a80000]'}`}
                           style={{ width: `${Math.max(4, (dish.quantity / maxSold) * 100)}%` }}
                         />
                       </div>

@@ -89,7 +89,7 @@ export default function OrderHistoryPanel({ open, onClose }) {
           className="absolute inset-0 z-[80] flex flex-col overflow-hidden bg-[#080303] will-change-[transform,opacity]"
         >
           {/* Same single static background as the chat */}
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_0%,rgba(180,20,35,0.32),transparent_42%),radial-gradient(circle_at_0%_55%,rgba(100,10,20,0.26),transparent_46%),radial-gradient(circle_at_90%_100%,rgba(130,15,25,0.2),transparent_44%),linear-gradient(145deg,#120304_0%,#080303_45%,#140305_100%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_0%,rgba(224,0,0,0.32),transparent_42%),radial-gradient(circle_at_0%_55%,rgba(120,6,0,0.26),transparent_46%),radial-gradient(circle_at_90%_100%,rgba(150,10,0,0.2),transparent_44%),linear-gradient(145deg,#120304_0%,#080303_45%,#140305_100%)]" />
 
           {/* HEADER */}
           <header className="relative z-10 flex items-center gap-3 border-b border-white/10 bg-black/20 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">

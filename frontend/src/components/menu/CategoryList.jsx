@@ -95,7 +95,7 @@ export default function CategoryList({
           {t('cat.title')}
         </h2>
 
-        <div className="mx-auto mt-2 h-[3px] w-12 rounded-full bg-gradient-to-r from-transparent via-maroon-bright to-transparent" />
+        <div className="mx-auto mt-2 h-[3px] w-12 rounded-full bg-gradient-to-r from-maroon-bright via-ember to-maroon-bright" />
       </div>
 
       {/* Categories wrapper */}
@@ -139,8 +139,8 @@ export default function CategoryList({
                 style={{ animationDelay: `${index * 70}ms` }}
                 className={`cat-rise group relative first:ms-auto last:me-auto h-[122px] w-[98px] short:h-[92px] short:w-[80px] tiny:h-[74px] tiny:w-[72px] shrink-0 overflow-hidden rounded-3xl border transition-all duration-500 active:scale-95 ${
                   isActive
-                    ? 'scale-105 border-maroon-bright bg-gradient-to-b from-maroon-bright via-maroon to-maroon-soft shadow-[0_0_28px_rgba(179,24,28,0.6)]'
-                    : 'border-line bg-panel hover:-translate-y-1 hover:border-maroon-bright/60 hover:shadow-[0_0_18px_rgba(179,24,28,0.3)]'
+                    ? 'scale-105 border-maroon-bright bg-gradient-to-b from-maroon-bright via-maroon to-maroon-soft shadow-[0_0_28px_rgba(252,0,0,0.6)]'
+                    : 'border-line bg-panel hover:-translate-y-1 hover:border-maroon-bright/60 hover:shadow-[0_0_18px_rgba(252,0,0,0.3)]'
                 }`}
               >
                 {/* Light sweep across the active card */}
@@ -160,7 +160,7 @@ export default function CategoryList({
                 {/* Image + spinning ring */}
                 <div className="relative z-10 mx-auto mt-2.5 h-[62px] w-[62px] short:mt-2 short:h-[42px] short:w-[42px] tiny:mt-1.5 tiny:h-[30px] tiny:w-[30px]">
                   {isActive && (
-                    <div className="cat-spin absolute -inset-[5px] rounded-full border-2 border-dashed border-cream/70" />
+                    <div className="cat-spin absolute -inset-[5px] rounded-full border-2 border-dashed border-ember" />
                   )}
 
                   <div
@@ -203,7 +203,7 @@ export default function CategoryList({
 
                 {/* Bottom indicator bar */}
                 <div
-                  className={`absolute bottom-0 left-1/2 h-[3px] -translate-x-1/2 rounded-full bg-cream transition-all duration-500 ${
+                  className={`absolute bottom-0 left-1/2 h-[3px] -translate-x-1/2 rounded-full bg-ember transition-all duration-500 ${
                     isActive ? 'w-10 opacity-100' : 'w-0 opacity-0'
                   }`}
                 />

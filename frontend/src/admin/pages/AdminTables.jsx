@@ -41,8 +41,8 @@ const POLL_MS = 5000
 
 const STATE = {
   available: { labelKey: 'admin.tables.state.available', border: '#12c27a', badge: 'bg-[#0f5a3a] text-[#7df0b8]', dot: 'bg-emerald-500' },
-  occupied: { labelKey: 'admin.tables.state.occupied', border: '#f0222c', badge: 'bg-[#8a0f17] text-[#ffc9cc]', dot: 'bg-[#f0222c]' },
-  cleaning: { labelKey: 'admin.tables.state.cleaning', border: '#ffa726', badge: 'bg-[#8a4b0f] text-[#ffd9a8]', dot: 'bg-amber-500' },
+  occupied: { labelKey: 'admin.tables.state.occupied', border: '#fc0000', badge: 'bg-[#8a0f17] text-[#ffc9cc]', dot: 'bg-[#fc0000]' },
+  cleaning: { labelKey: 'admin.tables.state.cleaning', border: '#ff7a00', badge: 'bg-[#8a4b0f] text-[#ffd9a8]', dot: 'bg-amber-500' },
   out_of_service: { labelKey: 'admin.tables.state.out_of_service', border: '#6f6f78', badge: 'bg-[#2a2b31] text-[#d6d6db]', dot: 'bg-zinc-500' },
 }
 
@@ -611,7 +611,7 @@ function TableMenu({ table, busy, onSeats, onStatus, onRemove, onClose }) {
               disabled={busy}
               onClick={() => onStatus(value)}
               className={`rounded-lg px-3 py-1.5 text-start text-xs transition ${
-                table.override === value ? 'bg-[#d9151f] text-white' : 'text-white/80 hover:bg-white/[0.08]'
+                table.override === value ? 'bg-[#e00000] text-white' : 'text-white/80 hover:bg-white/[0.08]'
               }`}
             >
               {label}
