@@ -91,7 +91,7 @@ export default function LanguageChooser({ onContinue }) {
             >
               <span
                 className={`relative block h-[116px] w-[100px] transition-transform duration-300 ${
-                  active ? 'scale-110 drop-shadow-[0_0_18px_rgba(252,0,0,0.75)]' : 'opacity-80'
+                  active ? 'scale-110 drop-shadow-[0_0_18px_rgba(179,24,28,0.75)]' : 'opacity-80'
                 }`}
               >
                 {/* hexagon border (shows only when selected) */}
@@ -124,7 +124,7 @@ export default function LanguageChooser({ onContinue }) {
         type="button"
         onClick={() => onContinue(selected)}
         dir={textDir}
-        className="w-full rounded-full bg-gradient-to-r from-maroon to-maroon-bright py-4 font-display text-lg tracking-wide text-cream shadow-[0_10px_30px_rgba(252,0,0,0.4)] transition active:scale-[0.98]"
+        className="w-full rounded-full bg-gradient-to-r from-maroon to-maroon-bright py-4 font-display text-lg tracking-wide text-cream shadow-[0_10px_30px_rgba(179,24,28,0.4)] transition active:scale-[0.98]"
       >
         {tr('lang.continue')}
       </button>

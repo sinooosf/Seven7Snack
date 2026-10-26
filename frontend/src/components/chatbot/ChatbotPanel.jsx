@@ -150,7 +150,7 @@ export default function ChatbotPanel({
       {/* BACKGROUND — one static gradient. (It used to be three huge blurred
           circles; blur filters that size on a layer that is also animating
           are what made phones lag and crash when the chat opened/closed.) */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_0%,rgba(224,0,0,0.32),transparent_42%),radial-gradient(circle_at_0%_55%,rgba(120,6,0,0.26),transparent_46%),radial-gradient(circle_at_90%_100%,rgba(150,10,0,0.2),transparent_44%),linear-gradient(145deg,#120304_0%,#080303_45%,#140305_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_0%,rgba(180,20,35,0.32),transparent_42%),radial-gradient(circle_at_0%_55%,rgba(100,10,20,0.26),transparent_46%),radial-gradient(circle_at_90%_100%,rgba(130,15,25,0.2),transparent_44%),linear-gradient(145deg,#120304_0%,#080303_45%,#140305_100%)]" />
 
       {/* HEADER */}
       <header className="relative z-10 flex items-center gap-3 border-b border-white/10 bg-black/20 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
@@ -243,7 +243,7 @@ export default function ChatbotPanel({
         <button
           type="submit"
           aria-label={t('chat.send')}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-maroon text-cream shadow-[0_0_20px_rgba(224,0,0,0.3)] transition hover:bg-maroon-bright active:scale-95"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-700 text-cream shadow-[0_0_20px_rgba(180,20,35,0.3)] transition hover:bg-red-600 active:scale-95"
         >
           <Send size={17} className="rtl:-scale-x-100" />
         </button>
@@ -286,7 +286,7 @@ function ChatBubble({ message, onAdd, onView }) {
       <div
         className={`max-w-[75%] rounded-2xl border px-3.5 py-2.5 text-sm text-cream shadow-lg ${
           isUser
-            ? 'rounded-ee-sm border-red-400/20 bg-maroon/85'
+            ? 'rounded-ee-sm border-red-400/20 bg-red-700/80'
             : 'rounded-es-sm border-white/10 bg-black/30'
         }`}
       >
@@ -343,7 +343,7 @@ function ChatBubble({ message, onAdd, onView }) {
                     <button
                       type="button"
                       onClick={() => onAdd(item.id)}
-                      className="rounded-full bg-maroon px-2.5 py-1 text-[11px] font-medium text-cream transition hover:bg-maroon-bright"
+                      className="rounded-full bg-red-700 px-2.5 py-1 text-[11px] font-medium text-cream transition hover:bg-red-600"
                     >
                       {t('chat.add')}
                     </button>

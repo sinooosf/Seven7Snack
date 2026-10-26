@@ -45,7 +45,7 @@ export default function MenuSection({ items, resetKey, bottomInset = 150 }) {
           </div>
  
           {/* Badge: gradient border + glow */}
-          <div className="rounded-full bg-gradient-to-r from-maroon-bright via-ember to-maroon-bright p-[1.5px] shadow-[0_0_24px_rgba(252,0,0,0.45)]">
+          <div className="rounded-full bg-gradient-to-r from-maroon-bright via-cream/70 to-maroon-bright p-[1.5px] shadow-[0_0_24px_rgba(179,24,28,0.45)]">
             <div className="relative flex items-center gap-2.5 overflow-hidden rounded-full bg-ink px-5 py-1.5">
               {/* Light sweep */}
               <div className="menu-shine pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-transparent via-white/20 to-transparent" />

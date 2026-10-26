@@ -78,8 +78,7 @@ describe('Table routing', () => {
     const user = userEvent.setup()
     renderAtPath('/ToHomeOrder')
 
-    // Add the first dish on screen (which dish that is doesn't matter here).
-    await user.click((await screen.findAllByRole('button', { name: /^add /i }))[0])
+    await user.click(await screen.findByRole('button', { name: /^add margherita$/i }))
     await user.click(screen.getByRole('button', { name: /place the order/i }))
     await user.click(screen.getByRole('button', { name: /yes, place order/i }))
 
@@ -92,7 +91,7 @@ describe('Table routing', () => {
     const user = userEvent.setup()
     renderAtTable('4')
 
-    await user.click((await screen.findAllByRole('button', { name: /^add /i }))[0])
+    await user.click(screen.getByRole('button', { name: /^add margherita$/i }))
     await user.click(screen.getByRole('button', { name: /place the order/i }))
     // Placing an order now asks for confirmation first.
     await user.click(screen.getByRole('button', { name: /yes, place order/i }))

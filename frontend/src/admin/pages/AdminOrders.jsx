@@ -140,7 +140,7 @@ export default function AdminOrders() {
   return (
     <div className="space-y-6">
       <PageTop
-        icon={<ClipboardList size={34} className="text-[#fc0000]" />}
+        icon={<ClipboardList size={34} className="text-[#f0222c]" />}
         title={t('admin.orders.title')}
         subtitle={t('admin.orders.subtitle')}
         range={range}
@@ -175,7 +175,7 @@ export default function AdminOrders() {
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder={t('admin.orders.searchPlaceholder')}
-                      className="h-11 w-full rounded-xl border border-white/[0.09] bg-[#121215] ps-10 pe-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#fc0000]/60"
+                      className="h-11 w-full rounded-xl border border-white/[0.09] bg-[#121215] ps-10 pe-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#f0222c]/60"
                     />
                   </div>
                   <Dropdown
@@ -348,7 +348,7 @@ function Pagination({ page, pageCount, onChange }) {
           type="button"
           onClick={() => onChange(p)}
           className={`h-9 w-9 rounded-lg text-sm font-medium transition ${
-            p === page ? 'bg-[#e00000] text-white' : 'text-white/65 hover:bg-white/[0.07]'
+            p === page ? 'bg-[#e11d28] text-white' : 'text-white/65 hover:bg-white/[0.07]'
           }`}
         >
           {p}
@@ -432,7 +432,7 @@ function OrderStatusPanel({ counts }) {
       <div className="flex items-center justify-between">
         <CardTitle icon={<LifeBuoy size={24} />} title={t('admin.orders.statusPanel')} />
         <span className="flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1 text-xs text-white/85">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#fc0000]" /> {t('admin.orders.live')}
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#f0222c]" /> {t('admin.orders.live')}
         </span>
       </div>
 
@@ -447,7 +447,7 @@ function OrderStatusPanel({ counts }) {
       </ul>
 
       <div className="mt-4 flex items-center gap-3 border-t border-white/[0.07] pt-4">
-        <ChefHat size={34} className="text-[#fc0000]" strokeWidth={1.4} />
+        <ChefHat size={34} className="text-[#f0222c]" strokeWidth={1.4} />
         <div>
           <p className="text-sm text-white/90">{t('admin.orders.tableToKitchen')}</p>
           <p className="text-xs text-white/45">{t('admin.orders.keepGoing')}</p>
@@ -486,7 +486,7 @@ function RecentActivity({ orders }) {
           <li key={order.id} className="flex items-center gap-3">
             <span
               className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white ${
-                isNew ? 'bg-[#e00000]' : order.status === 'cancelled' ? 'bg-[#7d1117]' : order.status === 'completed' ? 'bg-[#2a2b31]' : 'bg-[#12a56b]'
+                isNew ? 'bg-[#d9151f]' : order.status === 'cancelled' ? 'bg-[#7d1117]' : order.status === 'completed' ? 'bg-[#2a2b31]' : 'bg-[#12a56b]'
               }`}
             >
               {isNew ? <ClipboardList size={19} /> : <Check size={19} />}

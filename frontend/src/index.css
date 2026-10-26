@@ -37,21 +37,14 @@
   --font-display: "Anton", sans-serif;
   --font-sans: "Poppins", sans-serif;
 
-  /* SEVEN brand palette, taken from the logo:
-       red     #fc0000  (the letters S, E, E, N)
-       orange  #fc7800  (the "7")
-       oxblood #400000  (the logo's dark background)
-     The token names (maroon, ink, ...) are kept so every component keeps
-     working; only the values changed. `ember` is the orange of the 7. */
-  --color-ink: #140303;
-  --color-panel: #260707;
-  --color-panel-light: #330c0c;
-  --color-maroon: #e00000;
-  --color-maroon-bright: #fc0000;
-  --color-maroon-soft: #5a0000;
-  --color-ember: #ff7a00;
+  --color-ink: #0b0b0c;
+  --color-panel: #1a1a1c;
+  --color-panel-light: #232325;
+  --color-maroon: #8a1014;
+  --color-maroon-bright: #b3181c;
+  --color-maroon-soft: #5c0d10;
   --color-cream: #f6f4f0;
-  --color-line: #4a1818;
+  --color-line: #3a3a3d;
 }
 
 html,
@@ -95,22 +88,21 @@ body {
 /* -------------------------------------------------------------------------
    STAFF DASHBOARD THEME
 
-   Everything under /admin wears these colors (black + the logo's red), so the customer
+   Everything under /admin wears these colors (black + red), so the customer
    menu keeps its own look. All dashboard pages use the same color names
    (ink, panel, line, maroon, cream), so changing the values below recolors
    the whole dashboard at once.
    ------------------------------------------------------------------------- */
 .admin-theme {
-  --color-ink: #0b0707;
-  --color-panel: #110c0c;
-  --color-panel-light: #1a1212;
-  --color-line: #2a1c1c;
+  --color-ink: #09090b;
+  --color-panel: #0f0f12;
+  --color-panel-light: #17171b;
+  --color-line: #232328;
   --color-cream: #f5f5f6;
 
-  --color-maroon: #e00000;
-  --color-maroon-bright: #fc0000;
-  --color-maroon-soft: #5a0000;
-  --color-ember: #ff7a00;
+  --color-maroon: #d9151f;
+  --color-maroon-bright: #f0222c;
+  --color-maroon-soft: #5a0b10;
 
   font-family: "Inter", "Poppins", system-ui, sans-serif;
 }
@@ -142,7 +134,7 @@ body {
   color: rgb(245 245 246 / 0.3);
 }
 .admin-theme .input:focus {
-  border-color: rgb(252 0 0 / 0.7);
+  border-color: rgb(240 34 44 / 0.7);
 }
 
 /* The "Call waiter" bell gives a small shake now and then so it is easy to spot. */

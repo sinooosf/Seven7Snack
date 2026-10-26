@@ -44,7 +44,7 @@ const DOTS = {
   ready: 'bg-violet-500',
   completed: 'bg-zinc-400',
   cancelled: 'bg-red-600',
-  occupied: 'bg-[#fc0000]',
+  occupied: 'bg-[#f0222c]',
   available: 'bg-emerald-500',
   cleaning: 'bg-amber-500',
   neutral: 'bg-white/40',
@@ -107,7 +107,7 @@ export default function AdminChatbot() {
     <div className="space-y-6 xl:flex xl:h-[calc(100dvh-4rem)] xl:flex-col xl:space-y-0 xl:gap-6">
       <PageTop
         icon={
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#e00000] text-white">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#d9151f] text-white">
             <Bot size={28} />
           </span>
         }
@@ -129,7 +129,7 @@ export default function AdminChatbot() {
               </div>
             </div>
             <span className="hidden items-center gap-2 rounded-full bg-white/[0.05] px-4 py-2 text-xs text-white/85 sm:flex">
-              <Sparkles size={14} className="text-[#fc0000]" /> {t('admin.chatbot.alwaysHere')}
+              <Sparkles size={14} className="text-[#f0222c]" /> {t('admin.chatbot.alwaysHere')}
             </span>
           </div>
 
@@ -163,14 +163,14 @@ export default function AdminChatbot() {
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder={t('admin.chatbot.placeholder')}
-                className="h-12 w-full rounded-full border border-white/[0.09] bg-[#121215] ps-11 pe-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#fc0000]/60"
+                className="h-12 w-full rounded-full border border-white/[0.09] bg-[#121215] ps-11 pe-4 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#f0222c]/60"
               />
             </div>
             <button
               type="submit"
               disabled={!draft.trim() || thinking}
               aria-label={t('admin.chatbot.send')}
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-[#e00000] text-white shadow-[0_6px_20px_rgba(224,0,0,0.4)] transition hover:bg-[#fc0000] disabled:opacity-50"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-[#d9151f] text-white shadow-[0_6px_20px_rgba(217,21,31,0.4)] transition hover:bg-[#f0222c] disabled:opacity-50"
             >
               <Send size={18} className="rtl:-scale-x-100" />
             </button>
@@ -189,7 +189,7 @@ export default function AdminChatbot() {
                   onClick={() => send(prompts[id])}
                   className="flex w-full items-center gap-4 rounded-xl bg-white/[0.04] px-4 py-3.5 text-start transition hover:bg-white/[0.08]"
                 >
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#5a0b10] text-[#ff4a3d]">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#5a0b10] text-[#ff4650]">
                     <Icon size={20} />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -227,7 +227,7 @@ function Bubble({ message, onNavigate }) {
   if (message.from === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[88%] rounded-2xl rounded-ee-sm bg-[#c80000] px-4 py-3 sm:max-w-[78%] sm:px-5 text-sm text-white">
+        <div className="max-w-[88%] rounded-2xl rounded-ee-sm bg-[#c4121c] px-4 py-3 sm:max-w-[78%] sm:px-5 text-sm text-white">
           <p>{message.text}</p>
           <p className="mt-1 flex items-center justify-end gap-1 text-[11px] text-white/70">
             {message.time} <CheckCheck size={13} />
@@ -263,7 +263,7 @@ function Bubble({ message, onNavigate }) {
                 key={a.label}
                 type="button"
                 onClick={() => onNavigate(a.to)}
-                className="rounded-full border border-[#e00000]/60 px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-[#e00000]/20"
+                className="rounded-full border border-[#d9151f]/60 px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-[#d9151f]/20"
               >
                 {a.label} <span className="inline-block rtl:-scale-x-100">→</span>
               </button>

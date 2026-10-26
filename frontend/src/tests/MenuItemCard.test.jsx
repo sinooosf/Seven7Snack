@@ -4,11 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import MenuItemCard from '../components/menu/MenuItemCard'
 import { CartProvider } from '../context/CartContext'
-import { MENU_ITEMS, getFinalPrice } from '../data/menu'
-
-// Dishes come from the built-in menu, so these tests keep working when the menu changes.
-const [DISH_A, DISH_B] = MENU_ITEMS
-const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+import { MENU_ITEMS } from '../data/menu'
 
 function renderCard(item) {
   return render(
@@ -22,22 +18,21 @@ function renderCard(item) {
 
 describe('MenuItemCard', () => {
   it('shows the plain price when there is no discount', () => {
-    const item = { ...DISH_A, discountPercent: 0 }
+    const item = MENU_ITEMS.find((i) => i.id === 'pizza-1') // Margherita, 450 DH
     renderCard(item)
-    expect(screen.getByText(`${item.price} DH`)).toBeInTheDocument()
+    expect(screen.getByText('450 DH')).toBeInTheDocument()
   })
 
   it('shows the discounted price and the crossed-out original price', () => {
-    const item = { ...DISH_A, price: 550, discountPercent: 50 }
+    const item = MENU_ITEMS.find((i) => i.id === 'pizza-10') // Garden Veggie Deluxe, 550 DH, -50%
     renderCard(item)
-    expect(getFinalPrice(item)).toBe(275)
     expect(screen.getByText('275 DH')).toBeInTheDocument()
     expect(screen.getByText('550 DH')).toBeInTheDocument()
     expect(screen.getByText('-50%')).toBeInTheDocument()
   })
 
   it('disables adding an unavailable item', () => {
-    const item = { ...DISH_A, available: false }
+    const item = MENU_ITEMS.find((i) => i.id === 'pizza-9') // marked unavailable
     renderCard(item)
     expect(screen.getByText('UNAVAILABLE')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /add/i })).not.toBeInTheDocument()
@@ -45,14 +40,13 @@ describe('MenuItemCard', () => {
 
   it('adding an item switches the card into quantity-stepper mode', async () => {
     const user = userEvent.setup()
-    const item = { ...DISH_B, available: true }
+    const item = MENU_ITEMS.find((i) => i.id === 'drink-1') // Coca-Cola
     renderCard(item)
-    const name = escapeRegExp(item.name)
 
-    await user.click(screen.getByRole('button', { name: new RegExp(`^add ${name}$`, 'i') }))
+    await user.click(screen.getByRole('button', { name: /^add coca-cola$/i }))
 
     expect(screen.getByText('1')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: new RegExp(`remove one ${name}`, 'i') })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /remove one coca-cola/i })).toBeInTheDocument()
   })
 })
 

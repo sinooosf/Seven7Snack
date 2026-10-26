@@ -229,7 +229,7 @@ export default function AdminNewOrder() {
                   onClick={() => { setCategory(c.id); setSearch('') }}
                   aria-pressed={!search.trim() && activeCategory === c.id}
                   className={`shrink-0 rounded-full border px-4 py-2 text-sm transition ${
-                    !search.trim() && activeCategory === c.id ? 'border-[#e00000] bg-[#e00000] text-white' : 'border-white/10 bg-[#121215] text-white/75 hover:bg-white/5'
+                    !search.trim() && activeCategory === c.id ? 'border-[#d9151f] bg-[#d9151f] text-white' : 'border-white/10 bg-[#121215] text-white/75 hover:bg-white/5'
                   }`}
                 >
                   {categoryName(c)}
@@ -253,7 +253,7 @@ export default function AdminNewOrder() {
                     key={item.id}
                     data-testid="dish-tile"
                     onClick={item.available ? () => change(item, 1) : undefined}
-                    className={`flex min-w-0 select-none items-center gap-3 overflow-hidden rounded-2xl border bg-[#0f0f12] p-2.5 transition duration-150 sm:flex-col sm:items-stretch sm:gap-0 lg:bg-[#0b0b0d] ${qty ? 'border-[#e00000]' : 'border-white/[0.07]'} ${item.available ? 'cursor-pointer' : 'opacity-50'} ${flash === item.id ? 'translate-y-1.5 scale-[0.98]' : ''}`}
+                    className={`flex min-w-0 select-none items-center gap-3 overflow-hidden rounded-2xl border bg-[#0f0f12] p-2.5 transition duration-150 sm:flex-col sm:items-stretch sm:gap-0 lg:bg-[#0b0b0d] ${qty ? 'border-[#d9151f]' : 'border-white/[0.07]'} ${item.available ? 'cursor-pointer' : 'opacity-50'} ${flash === item.id ? 'translate-y-1.5 scale-[0.98]' : ''}`}
                   >
                     <FadeImage src={item.image} alt="" className="h-16 w-16 shrink-0 rounded-xl bg-white/5 sm:h-24 sm:w-full" />
                     <div className="min-w-0 flex-1 sm:mt-2 sm:flex-none">
@@ -273,7 +273,7 @@ export default function AdminNewOrder() {
                           <button type="button" aria-label={t('admin.newOrder.addAria', { name })} onClick={(e) => { e.stopPropagation(); change(item, 1) }} className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white/10"><Plus size={16} /></button>
                         </div>
                       ) : (
-                        <button type="button" aria-label={t('admin.newOrder.addAria', { name })} onClick={(e) => { e.stopPropagation(); change(item, 1) }} className="flex h-11 w-11 items-center justify-center gap-1.5 rounded-xl bg-[#e00000] text-sm font-medium text-white hover:bg-[#fc0000] sm:h-9 sm:w-full">
+                        <button type="button" aria-label={t('admin.newOrder.addAria', { name })} onClick={(e) => { e.stopPropagation(); change(item, 1) }} className="flex h-11 w-11 items-center justify-center gap-1.5 rounded-xl bg-[#d9151f] text-sm font-medium text-white hover:bg-[#f0222c] sm:h-9 sm:w-full">
                           <Plus size={16} /> <span className="hidden sm:inline">{t('admin.newOrder.add')}</span>
                         </button>
                       )}

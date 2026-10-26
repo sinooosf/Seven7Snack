@@ -152,7 +152,7 @@ function Content({ data, metric, setMetric, range, setRange, vs, isToday }) {
                   type="button"
                   onClick={() => setMetric(key)}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition sm:px-5 ${
-                    metric === key ? 'bg-[#e00000] text-white' : 'text-white/55 hover:text-white'
+                    metric === key ? 'bg-[#d9151f] text-white' : 'text-white/55 hover:text-white'
                   }`}
                 >
                   {label}
@@ -192,7 +192,7 @@ function Content({ data, metric, setMetric, range, setRange, vs, isToday }) {
             icon={<List size={24} />}
             title={t('admin.overview.recentOrders')}
             action={
-              <Link to="/admin/orders" className="text-sm font-medium text-[#fc0000] hover:text-[#ff5a4d]">
+              <Link to="/admin/orders" className="text-sm font-medium text-[#f0222c] hover:text-[#ff5a63]">
                 {t('admin.overview.viewAll')}
               </Link>
             }
@@ -236,11 +236,11 @@ function Content({ data, metric, setMetric, range, setRange, vs, isToday }) {
           <div className="mt-6 space-y-5">
             <QuickRow
               icon={<Armchair size={20} />}
-              tint="bg-[#3a0d12] text-[#ff4a3d]"
+              tint="bg-[#3a0d12] text-[#ff4650]"
               label={t('admin.overview.activeTables')}
               value={`${quick.activeTables} / ${quick.totalTables}`}
               pct={quick.totalTables ? (quick.activeTables / quick.totalTables) * 100 : 0}
-              bar="bg-[#fc0000]"
+              bar="bg-[#f0222c]"
             />
             <QuickRow
               icon={<Hourglass size={20} />}
@@ -260,11 +260,11 @@ function Content({ data, metric, setMetric, range, setRange, vs, isToday }) {
             />
             <QuickRow
               icon={<XCircle size={20} />}
-              tint="bg-[#3a0d12] text-[#ff4a3d]"
+              tint="bg-[#3a0d12] text-[#ff4650]"
               label={t('admin.overview.cancelledOrders')}
               value={quick.cancelled}
               pct={(quick.cancelled / totalForBars) * 100}
-              bar="bg-[#fc0000]"
+              bar="bg-[#f0222c]"
             />
           </div>
         </Card>

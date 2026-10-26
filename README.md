@@ -1,4 +1,4 @@
-# SEVEN7SNCACK — Restaurant Ordering System
+# Meet The Chefs — Restaurant Ordering System
 
 A full QR-code table ordering system: each table gets its own link,
 customers order from their phone, and staff track it through a live

@@ -34,7 +34,7 @@ export default function MenuItemCard({ item }) {
         item.available ? 'cursor-pointer select-none' : ''
       } ${pressed ? 'translate-y-1.5 scale-[0.98]' : 'translate-y-0 scale-100'}`}
     >
-      <div className="relative aspect-[4/3] w-full">
+      <div className="relative aspect-square w-full">
         <FadeImage
           src={item.image}
           alt={name}
@@ -46,7 +46,7 @@ export default function MenuItemCard({ item }) {
         </span>
 
         {hasDiscount && (
-          <span className="absolute start-2 top-9 -rotate-6 rtl:rotate-6 rounded bg-ember px-1.5 py-0.5 text-[10px] font-extrabold text-ink shadow">
+          <span className="absolute start-2 top-9 -rotate-6 rtl:rotate-6 rounded bg-maroon-bright px-1.5 py-0.5 text-[10px] font-bold text-cream shadow">
             -{item.discountPercent}%
           </span>
         )}

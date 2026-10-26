@@ -39,7 +39,7 @@ export default function CallWaiterButton({ variant = 'floating', style, classNam
     : waiting || busy
       ? 'bg-panel-light text-cream ring-1 ring-cream/25'
       : failed
-        ? 'bg-maroon text-cream'
+        ? 'bg-red-600 text-cream'
         : 'bg-maroon-bright text-cream hover:bg-maroon'
 
   if (variant === 'inline') {

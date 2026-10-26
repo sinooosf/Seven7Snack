@@ -117,8 +117,8 @@ export default function ReportsChart({ points, metric = 'revenue', granularity =
       <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full select-none" role="img" aria-label={t('admin.reports.chartAria')}>
         <defs>
           <linearGradient id="report-bar" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#fc0000" />
-            <stop offset="1" stopColor="#a80000" />
+            <stop offset="0" stopColor="#f0222c" />
+            <stop offset="1" stopColor="#a3101a" />
           </linearGradient>
         </defs>
 
@@ -174,7 +174,7 @@ export default function ReportsChart({ points, metric = 'revenue', granularity =
         >
           <p className="mb-1.5 text-white/70">{longLabelOf(hovered)}</p>
           <p className="text-white">
-            <span className="me-2 inline-block h-2 w-2 rounded-full bg-[#fc0000]" />
+            <span className="me-2 inline-block h-2 w-2 rounded-full bg-[#f0222c]" />
             {t('admin.reports.sales')}: {money(hovered.revenue, lang)}
           </p>
           <p className="mt-1 text-white/80">

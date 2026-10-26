@@ -19,12 +19,12 @@ self.addEventListener('push', (event) => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       if (windows.some((c) => c.visibilityState === 'visible' && c.focused)) return
 
-      await self.registration.showNotification(data.title || 'Seven Snack', {
+      await self.registration.showNotification(data.title || 'Meet The Chefs', {
         body: data.body || '',
         tag: data.tag,
         renotify: true,
-        icon: '/icon.png',
-        badge: '/icon.png',
+        icon: '/logo.png',
+        badge: '/logo.png',
         vibrate: [200, 100, 200, 100, 200],
         requireInteraction: true,
         data: { url: data.url || '/admin' },
