@@ -1,0 +1,912 @@
+import { describe, it, before, after } from 'node:test'
+import assert from 'node:assert/strict'
+import pg from 'pg'
+import { resetDatabase, startServer, firstMenuItems, ADMIN_PASSWORD, TEST_DB } from './helpers.js'
+
+let srv
+let api
+let dishes
+
+before(async () => {
+  await resetDatabase()
+  srv = await startServer()
+  api = srv.api
+  dishes = await firstMenuItems(api, 3)
+})
+
+after(async () => {
+  await srv?.stop()
+})
+
+const place = (tableId, lines) => api('/orders', { method: 'POST', body: { tableId, items: lines } })
+const line = (i = 0, quantity = 1) => ({ id: dishes[i].id, quantity })
+
+// No request may EVER answer 5xx: a 500 means the server did not expect the input.
+function noServerError(res, label) {
+  assert.ok(res.status < 500, `${label}: got ${res.status} ${res.text.slice(0, 200)}`)
+}
+
+describe('public endpoints', () => {
+  it('health, menu and tables answer', async () => {
+    assert.equal((await api('/health')).status, 200)
+    const menu = await api('/menu')
+    assert.ok(menu.body.categories.length > 0 && menu.body.items.length > 0)
+    const tables = await api('/tables')
+    assert.ok(tables.body.some((t) => t.id === 'home' && t.kind === 'home'))
+    assert.ok(tables.body.some((t) => t.id === '1'))
+    assert.equal((await api('/chatbot/faqs')).status, 200)
+  })
+
+  it('looks one table up, and 404s (never 500s) on strange ids', async () => {
+    assert.equal((await api('/tables/1')).status, 200)
+    assert.equal((await api('/tables/home')).body.kind, 'home')
+    for (const id of ['999', 'abc', '%27%20OR%201=1--', '..%2F..%2Fetc', '%00', 'x'.repeat(5000), '%E2%9C%93', '1;DROP%20TABLE%20orders']) {
+      const res = await api(`/tables/${id}`)
+      noServerError(res, `GET /tables/${id.slice(0, 20)}`)
+      assert.equal(res.status, 404)
+    }
+  })
+
+  it('unknown routes answer 404, wrong methods do not crash', async () => {
+    assert.equal((await api('/nope')).status, 404)
+    noServerError(await api('/menu', { method: 'DELETE' }), 'DELETE /menu')
+    noServerError(await api('/orders', { method: 'PUT', body: {} }), 'PUT /orders')
+  })
+})
+
+describe('placing orders', () => {
+  it('prices come from the server, discounts applied, client prices ignored', async () => {
+    const res = await api('/orders', {
+      method: 'POST',
+      body: { tableId: '1', items: [{ id: dishes[0].id, quantity: 2, unitPrice: 1, price: 1, name: 'HACKED', total: 1 }], total: 1 },
+    })
+    assert.equal(res.status, 201)
+    const unit = dishes[0].discountPercent ? Math.round(dishes[0].price * (1 - dishes[0].discountPercent / 100)) : dishes[0].price
+    assert.equal(res.body.total, unit * 2)
+    assert.notEqual(res.body.items[0].name, 'HACKED')
+    assert.equal(res.body.status, 'preparing')
+  })
+
+  it('rejects every kind of malformed order with 400 (never 500)', async () => {
+    const bad = [
+      ['no body', undefined],
+      ['empty object', {}],
+      ['no table', { items: [line()] }],
+      ['empty items', { tableId: '1', items: [] }],
+      ['items not array', { tableId: '1', items: 'pizza' }],
+      ['items object', { tableId: '1', items: { id: 'x' } }],
+      ['null line', { tableId: '1', items: [null] }],
+      ['line without id', { tableId: '1', items: [{ quantity: 1 }] }],
+      ['qty 0', { tableId: '1', items: [line(0, 0)] }],
+      ['qty negative', { tableId: '1', items: [line(0, -3)] }],
+      ['qty fraction', { tableId: '1', items: [line(0, 1.5)] }],
+      ['qty text', { tableId: '1', items: [line(0, 'abc')] }],
+      ['qty null', { tableId: '1', items: [{ id: dishes[0].id, quantity: null }] }],
+      ['qty huge', { tableId: '1', items: [line(0, 1e9)] }],
+      ['qty beyond int', { tableId: '1', items: [line(0, 99999999999)] }],
+      ['qty Infinity-ish', { tableId: '1', items: [{ id: dishes[0].id, quantity: 1e400 }] }],
+      ['table is object', { tableId: { a: 1 }, items: [line()] }],
+      ['table is array', { tableId: ['1'], items: [line()] }],
+      ['table is boolean', { tableId: true, items: [line()] }],
+      ['unknown table', { tableId: '9999', items: [line()] }],
+      ['sql in table', { tableId: "1' OR '1'='1", items: [line()] }],
+      ['item id object', { tableId: '1', items: [{ id: { x: 1 }, quantity: 1 }] }],
+      ['item id array', { tableId: '1', items: [{ id: ['a'], quantity: 1 }] }],
+      ['unknown item', { tableId: '1', items: [{ id: 'does-not-exist', quantity: 1 }] }],
+      ['sql in item', { tableId: '1', items: [{ id: "x'; DROP TABLE orders;--", quantity: 1 }] }],
+      ['200 lines', { tableId: '1', items: Array.from({ length: 200 }, () => line()) }],
+    ]
+    for (const [label, body] of bad) {
+      const res = await api('/orders', { method: 'POST', body })
+      assert.equal(res.status, 400, `${label}: expected 400, got ${res.status} ${res.text.slice(0, 160)}`)
+    }
+  })
+
+  it('handles broken or oversized request bodies', async () => {
+    const broken = await api('/orders', { method: 'POST', raw: '{"tableId": ', headers: { 'content-type': 'application/json' } })
+    assert.equal(broken.status, 400)
+    const wrongType = await api('/orders', { method: 'POST', raw: 'tableId=1', headers: { 'content-type': 'text/plain' } })
+    noServerError(wrongType, 'text/plain body')
+    const huge = await api('/orders', { method: 'POST', raw: JSON.stringify({ tableId: '1', items: [], pad: 'x'.repeat(3_000_000) }), headers: { 'content-type': 'application/json' } })
+    assert.equal(huge.status, 413)
+    assert.ok(srv.alive())
+  })
+
+  it('rejects unavailable dishes', async () => {
+    const all = await api('/admin/menu-items', { admin: true })
+    const hidden = all.body.find((i) => !i.available)
+    if (!hidden) return
+    const res = await place('1', [{ id: hidden.id, quantity: 1 }])
+    assert.equal(res.status, 400)
+  })
+
+  it('identical lines are accepted and totalled correctly', async () => {
+    const res = await place('2', [line(0, 1), line(0, 2)])
+    assert.equal(res.status, 201)
+    const unit = res.body.items[0].unitPrice
+    assert.equal(res.body.total, unit * 3)
+  })
+})
+
+describe('reading, adding to and cancelling orders', () => {
+  it('weird order ids give 404, never 500', async () => {
+    for (const id of ['abc', '-1', '1.5', '0', '99999999999999999999999', '%27', '1%20OR%201=1', 'x'.repeat(3000)]) {
+      for (const [method, suffix] of [['GET', ''], ['PATCH', '/cancel'], ['POST', '/items']]) {
+        const res = await api(`/orders/${id}${suffix}`, { method, body: method === 'GET' ? undefined : { items: [line()] } })
+        noServerError(res, `${method} /orders/${id.slice(0, 12)}${suffix}`)
+        assert.ok([400, 404].includes(res.status), `${method} ${id.slice(0, 12)}${suffix} -> ${res.status}`)
+      }
+    }
+  })
+
+  it('active order is found per table; unknown and home tables give null', async () => {
+    const created = await place('3', [line()])
+    const active = await api('/orders/table/3/active')
+    assert.equal(active.body.id, created.body.id)
+    assert.equal((await api('/orders/table/9999/active')).body, null)
+    assert.equal((await api('/orders/table/home/active')).body, null)
+    noServerError(await api(`/orders/table/${encodeURIComponent("1' OR 1=1--")}/active`), 'sql in table')
+  })
+
+  it('adds dishes to the same order and recomputes the total', async () => {
+    const created = await place('4', [line(0, 1)])
+    const more = await api(`/orders/${created.body.id}/items`, { method: 'POST', body: { items: [line(0, 2), line(1, 1)] } })
+    assert.equal(more.status, 200)
+    const expected = more.body.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
+    assert.equal(more.body.total, expected)
+    assert.equal(more.body.items.find((i) => i.id === dishes[0].id).quantity, 3)
+    for (const bad of [{}, { items: [] }, { items: 'x' }, { items: [{ id: 'nope', quantity: 1 }] }, { items: [line(0, 0)] }, { items: [line(0, 1e9)] }]) {
+      const res = await api(`/orders/${created.body.id}/items`, { method: 'POST', body: bad })
+      assert.equal(res.status, 400, JSON.stringify(bad).slice(0, 60))
+    }
+  })
+
+  it('locks the order once the kitchen has started', async () => {
+    const created = await place('5', [line()])
+    await api(`/admin/orders/${created.body.id}/status`, { method: 'PATCH', admin: true, body: { status: 'almost' } })
+    assert.equal((await api(`/orders/${created.body.id}/items`, { method: 'POST', body: { items: [line()] } })).status, 409)
+    assert.equal((await api(`/orders/${created.body.id}/cancel`, { method: 'PATCH' })).status, 409)
+  })
+
+  it('customer cancel works once, then 409; unknown order 404', async () => {
+    const created = await place('6', [line()]).catch(() => null)
+    const order = created?.status === 201 ? created : await place('home', [line()])
+    const id = order.body.id
+    assert.equal((await api(`/orders/${id}/cancel`, { method: 'PATCH' })).body.status, 'cancelled')
+    assert.equal((await api(`/orders/${id}/cancel`, { method: 'PATCH' })).status, 409)
+    assert.equal((await api('/orders/99999999/cancel', { method: 'PATCH' })).status, 404)
+    assert.equal((await api(`/orders/${id}/items`, { method: 'POST', body: { items: [line()] } })).status, 409)
+  })
+})
+
+describe('admin protection', () => {
+  const routes = [
+    ['GET', '/admin/orders'], ['GET', '/admin/summary'], ['GET', '/admin/overview'], ['GET', '/admin/tables'],
+    ['GET', '/admin/menu-items'], ['GET', '/admin/categories'], ['GET', '/admin/chatbot-faqs'], ['GET', '/admin/orders/1'],
+    ['POST', '/admin/tables'], ['PATCH', '/admin/tables/1'], ['DELETE', '/admin/tables/1'],
+    ['POST', '/admin/menu-items'], ['PUT', '/admin/menu-items/x'], ['DELETE', '/admin/menu-items/x'],
+    ['POST', '/admin/categories'], ['DELETE', '/admin/categories/x'], ['PATCH', '/admin/orders/1/status'],
+    ['PATCH', '/admin/orders/1/move'], ['POST', '/admin/orders/merge'], ['POST', '/admin/chatbot-faqs'],
+    ['GET', '/admin/earnings/today'], ['GET', '/admin/reports'], ['POST', '/admin/orders'], ['GET', '/admin/waiter-calls'], ['PATCH', '/admin/waiter-calls/1/resolve'],
+  ]
+
+  it('refuses every admin route without / with a wrong password', async () => {
+    for (const [method, path] of routes) {
+      const none = await api(path, { method, body: method === 'GET' ? undefined : {} })
+      assert.equal(none.status, 401, `${method} ${path} without password -> ${none.status}`)
+      const wrong = await api(path, { method, admin: true, password: 'nope', body: method === 'GET' ? undefined : {} })
+      assert.equal(wrong.status, 401, `${method} ${path} wrong password -> ${wrong.status}`)
+    }
+    for (const pw of ['', ' ', ADMIN_PASSWORD.toUpperCase(), 'x'.repeat(10000)]) {
+      const res = await api('/admin/orders', { admin: true, password: pw })
+      assert.equal(res.status, 401, `password ${JSON.stringify(pw.slice(0, 10))}`)
+    }
+  })
+
+  it('blocks an address after too many wrong passwords (and a right one still works before that)', async () => {
+    const strict = await startServer({ ADMIN_MAX_FAILS: '3' })
+    try {
+      const login = (password) =>
+        fetch(`${strict.base}/admin/login`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ password }),
+        })
+      assert.equal((await login('bad1')).status, 401)
+      assert.equal((await login(ADMIN_PASSWORD)).status, 200) // a right one clears the count
+      for (let i = 0; i < 3; i++) assert.equal((await login('bad')).status, 401)
+      const blocked = await login(ADMIN_PASSWORD)
+      assert.equal(blocked.status, 429)
+      assert.ok(Number(blocked.headers.get('retry-after')) > 0)
+    } finally {
+      await strict.stop()
+    }
+  })
+
+  it('login succeeds with the right password', async () => {
+    assert.equal((await api('/admin/orders', { admin: true })).status, 200)
+  })
+})
+
+describe('admin: menu and categories', () => {
+  it('validates new dishes', async () => {
+    const base = { id: 'test-dish', categoryId: 'pizza', name: 'Test', price: 100, image: '/x.jpg' }
+    const cats = await api('/admin/categories', { admin: true })
+    const cat = cats.body[0].id
+    const ok = await api('/admin/menu-items', { method: 'POST', admin: true, body: { ...base, categoryId: cat } })
+    assert.equal(ok.status, 201, ok.text)
+    assert.equal((await api('/admin/menu-items', { method: 'POST', admin: true, body: { ...base, categoryId: cat } })).status, 409)
+    const bad = [
+      { ...base, id: 'b1', categoryId: cat, price: -5 }, { ...base, id: 'b2', categoryId: cat, price: 'abc' },
+      { ...base, id: 'b3', categoryId: cat, price: 1e12 }, { ...base, id: 'b4', categoryId: cat, price: 10.5 },
+      { ...base, id: 'b5', categoryId: cat, discountPercent: 150 }, { ...base, id: 'b6', categoryId: cat, discountPercent: -1 },
+      { ...base, id: 'b7', categoryId: 'no-such-category' }, { ...base, id: 'b8', categoryId: cat, name: '' },
+      { ...base, id: 'b9', categoryId: cat, name: 'x'.repeat(5000) }, { ...base, id: { a: 1 }, categoryId: cat },
+      { ...base, id: 'b10', categoryId: cat, available: 'yes' }, {},
+    ]
+    for (const body of bad) {
+      const res = await api('/admin/menu-items', { method: 'POST', admin: true, body })
+      assert.equal(res.status, 400, `expected 400 for ${JSON.stringify(body).slice(0, 80)}, got ${res.status} ${res.text.slice(0, 100)}`)
+    }
+  })
+
+  it('validates edits and deletes', async () => {
+    for (const body of [{ price: -1 }, { price: 'x' }, { discountPercent: 500 }, { categoryId: 'ghost' }, { name: '' }]) {
+      const res = await api('/admin/menu-items/test-dish', { method: 'PUT', admin: true, body })
+      assert.equal(res.status, 400, JSON.stringify(body))
+    }
+    assert.equal((await api('/admin/menu-items/test-dish', { method: 'PUT', admin: true, body: { price: 120, available: false } })).body.price, 120)
+    assert.equal((await api('/admin/menu-items/ghost', { method: 'PUT', admin: true, body: { price: 1 } })).status, 404)
+    assert.equal((await api('/admin/menu-items/test-dish', { method: 'DELETE', admin: true })).status, 200)
+    assert.equal((await api('/admin/menu-items/test-dish', { method: 'DELETE', admin: true })).status, 404)
+  })
+
+  it('categories: create, duplicate, protect non-empty, delete', async () => {
+    assert.equal((await api('/admin/categories', { method: 'POST', admin: true, body: { name: 'Desserts' } })).status, 201)
+    assert.equal((await api('/admin/categories', { method: 'POST', admin: true, body: { name: 'Desserts' } })).status, 409)
+    for (const body of [{}, { name: '' }, { name: '   ' }, { name: '!!!' }, { name: { a: 1 } }]) {
+      assert.equal((await api('/admin/categories', { method: 'POST', admin: true, body })).status, 400, JSON.stringify(body))
+    }
+    assert.equal((await api('/admin/categories/pizza', { method: 'DELETE', admin: true })).status, 409)
+    assert.equal((await api('/admin/categories/desserts', { method: 'DELETE', admin: true })).status, 200)
+    assert.equal((await api('/admin/categories/desserts', { method: 'DELETE', admin: true })).status, 404)
+  })
+
+  it('categories: with ?withDishes=true a non-empty category is deleted together with its dishes', async () => {
+    assert.equal((await api('/admin/categories', { method: 'POST', admin: true, body: { name: 'Specials' } })).status, 201)
+    const dish = await api('/admin/menu-items', {
+      method: 'POST', admin: true,
+      body: { categoryId: 'specials', name: 'Special Dish', price: 50, image: '/logo.png' },
+    })
+    assert.equal(dish.status, 201)
+
+    // Without the flag it is still protected.
+    assert.equal((await api('/admin/categories/specials', { method: 'DELETE', admin: true })).status, 409)
+    // With the flag the category and its dish are both gone.
+    const done = await api('/admin/categories/specials?withDishes=true', { method: 'DELETE', admin: true })
+    assert.equal(done.status, 200)
+    assert.equal(done.body.removedDishes, 1)
+
+    const items = await api('/admin/menu-items', { admin: true })
+    assert.ok(!items.body.some((i) => i.id === dish.body.id))
+    assert.equal((await api('/admin/categories/specials?withDishes=true', { method: 'DELETE', admin: true })).status, 404)
+  })
+})
+
+describe('admin: tables', () => {
+  it('adds tables with validation; the link works immediately', async () => {
+    const ok = await api('/admin/tables', { method: 'POST', admin: true, body: { id: '20', seats: 6 } })
+    assert.equal(ok.status, 201)
+    assert.equal((await api('/tables/20')).status, 200)
+    assert.equal((await place('20', [line()])).status, 201)
+    assert.equal((await api('/admin/tables', { method: 'POST', admin: true, body: { id: '20' } })).status, 409)
+    for (const body of [{}, { id: '' }, { id: '  ' }, { id: 'a b' }, { id: '../x' }, { id: 'home' }, { id: 'HOME' }, { id: 'x'.repeat(200) }, { id: { a: 1 } }, { id: '1;--' }, { id: '<script>' }]) {
+      const res = await api('/admin/tables', { method: 'POST', admin: true, body })
+      assert.equal(res.status, 400, `${JSON.stringify(body).slice(0, 40)} -> ${res.status}`)
+    }
+    const big = await api('/admin/tables', { method: 'POST', admin: true, body: { id: '21', seats: 9999 } })
+    assert.equal(big.body.seats, 20)
+    const neg = await api('/admin/tables', { method: 'POST', admin: true, body: { id: '22', seats: -4 } })
+    assert.ok(neg.body.seats >= 1)
+  })
+
+  it('patches seats, status and position with clamping', async () => {
+    const t = await api('/admin/tables/21', { method: 'PATCH', admin: true, body: { seats: 3, status: 'cleaning', posX: 150, posY: -20 } })
+    assert.equal(t.status, 200)
+    assert.equal(t.body.seats, 3)
+    assert.equal(t.body.posX, 100)
+    assert.equal(t.body.posY, 0)
+    for (const body of [{ status: 'banana' }, { status: 5 }]) {
+      assert.equal((await api('/admin/tables/21', { method: 'PATCH', admin: true, body })).status, 400)
+    }
+    for (const body of [{ posX: 'abc' }, { posX: null, posY: {} }, { seats: 'many' }]) {
+      noServerError(await api('/admin/tables/21', { method: 'PATCH', admin: true, body }), JSON.stringify(body))
+    }
+    assert.equal((await api('/admin/tables/ghost', { method: 'PATCH', admin: true, body: { seats: 2 } })).status, 404)
+    assert.equal((await api('/admin/tables/home', { method: 'PATCH', admin: true, body: { seats: 2 } })).status, 404)
+  })
+
+  it('shows occupied tables and refuses to delete a busy one; home cannot be deleted', async () => {
+    const list = await api('/admin/tables', { admin: true })
+    const t20 = list.body.find((t) => t.id === '20')
+    assert.equal(t20.state, 'occupied')
+    assert.equal((await api('/admin/tables/20', { method: 'DELETE', admin: true })).status, 409)
+    assert.equal((await api('/admin/tables/home', { method: 'DELETE', admin: true })).status, 400)
+    assert.equal((await api('/admin/tables/21', { method: 'DELETE', admin: true })).status, 200)
+    assert.equal((await api('/admin/tables/21', { method: 'DELETE', admin: true })).status, 404)
+    assert.equal((await api('/tables/21')).status, 404)
+  })
+})
+
+describe('admin: orders, move and merge', () => {
+  const setStatus = (id, status) => api(`/admin/orders/${id}/status`, { method: 'PATCH', admin: true, body: { status } })
+
+  it('walks an order through every status and validates input', async () => {
+    const o = (await place('home', [line()])).body
+    for (const s of ['almost', 'ready', 'completed']) assert.equal((await setStatus(o.id, s)).body.status, s)
+    for (const bad of ['', 'banana', null, 5, undefined]) assert.equal((await setStatus(o.id, bad)).status, 400, String(bad))
+    assert.equal((await setStatus(99999999, 'ready')).status, 404)
+    assert.equal((await setStatus('abc', 'ready')).status, 404)
+  })
+
+  it('moves and merges orders, and refuses nonsense', async () => {
+    await api('/admin/tables', { method: 'POST', admin: true, body: { id: '30' } })
+    await api('/admin/tables', { method: 'POST', admin: true, body: { id: '31' } })
+    await api('/admin/tables', { method: 'POST', admin: true, body: { id: '32' } })
+    const a = (await place('30', [line(0, 1)])).body
+    const b = (await place('31', [line(0, 2), line(1, 1)])).body
+
+    const move = (id, tableId) => api(`/admin/orders/${id}/move`, { method: 'PATCH', admin: true, body: { tableId } })
+    assert.equal((await move(a.id, '31')).status, 409) // busy
+    assert.equal((await move(a.id, 'ghost')).status, 404)
+    assert.equal((await move(a.id, 'home')).status, 404)
+    assert.equal((await move(a.id, undefined)).status, 404)
+    await api('/admin/tables/32', { method: 'PATCH', admin: true, body: { status: 'out_of_service' } })
+    assert.equal((await move(a.id, '32')).status, 409)
+    await api('/admin/tables/32', { method: 'PATCH', admin: true, body: { status: 'auto' } })
+    assert.equal((await move(a.id, '32')).body.tableId, '32')
+
+    const merge = (from, into) => api('/admin/orders/merge', { method: 'POST', admin: true, body: { fromOrderId: from, intoOrderId: into } })
+    assert.equal((await merge(a.id, a.id)).status, 400)
+    assert.equal((await merge('x', b.id)).status, 400)
+    assert.equal((await merge(a.id, 99999999)).status, 404)
+    const merged = await merge(a.id, b.id)
+    assert.equal(merged.status, 200)
+    assert.equal(merged.body.items.find((i) => i.id === dishes[0].id).quantity, 3)
+    assert.equal(merged.body.total, merged.body.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0))
+    assert.equal((await api(`/orders/${a.id}`)).status, 404) // the emptied order is gone
+
+    await setStatus(b.id, 'completed')
+    const c = (await place('30', [line()])).body
+    assert.equal((await merge(c.id, b.id)).status, 409) // closed order
+    assert.equal((await move(b.id, '30')).status, 409)
+  })
+
+  it('overview, summary, lists and earnings answer with sane numbers', async () => {
+    for (const range of ['today', 'yesterday', 'banana', '', "'; DROP TABLE orders;--"]) {
+      const res = await api(`/admin/overview?range=${encodeURIComponent(range)}`, { admin: true })
+      assert.equal(res.status, 200, range)
+      assert.equal(res.body.hourly.current.length, 24)
+      assert.ok(res.body.current.orders >= 0)
+    }
+    const today = (await api('/admin/overview', { admin: true })).body
+    const list = (await api('/admin/orders?range=today', { admin: true })).body
+    assert.equal(today.current.orders, list.orders.filter((o) => o.status !== 'cancelled').length)
+    assert.equal(today.current.revenue, list.orders.filter((o) => o.status !== 'cancelled').reduce((s, o) => s + o.total, 0))
+    for (const range of ['today', 'yesterday', 'all', 'zzz']) assert.equal((await api(`/admin/orders?range=${range}`, { admin: true })).status, 200)
+    const summary = await api('/admin/summary', { admin: true })
+    assert.equal(summary.body.pendingCount, list.counts.preparing + list.counts.almost)
+    assert.equal((await api('/admin/earnings/today', { admin: true })).status, 200)
+    assert.equal((await api('/admin/orders/abc', { admin: true })).status, 404)
+    assert.equal((await api('/admin/orders/99999999', { admin: true })).status, 404)
+  })
+
+  it('faq CRUD validates input', async () => {
+    const created = await api('/admin/chatbot-faqs', { method: 'POST', admin: true, body: { keyword: 'wifi', answer: 'Password: chef123' } })
+    assert.equal(created.status, 201, created.text)
+    for (const body of [{}, { keyword: '' }, { keyword: 'x' }, { answer: 'x' }, { keyword: { a: 1 }, answer: 'x' }]) {
+      assert.ok([400].includes((await api('/admin/chatbot-faqs', { method: 'POST', admin: true, body })).status), JSON.stringify(body))
+    }
+    assert.equal((await api(`/admin/chatbot-faqs/${created.body.id}`, { method: 'DELETE', admin: true })).status, 200)
+    assert.equal((await api(`/admin/chatbot-faqs/${created.body.id}`, { method: 'DELETE', admin: true })).status, 404)
+    assert.equal((await api('/admin/chatbot-faqs/abc', { method: 'DELETE', admin: true })).status, 404)
+  })
+
+  it('stores hostile text safely (XSS / SQL) and returns it unchanged', async () => {
+    const nasty = `<img src=x onerror=alert(1)> ' OR 1=1; -- "quotes" \u202e emoji 🍕`
+    const cats = await api('/admin/categories', { admin: true })
+    const res = await api('/admin/menu-items', { method: 'POST', admin: true, body: { id: 'nasty', categoryId: cats.body[0].id, name: nasty, price: 10, image: '/x.jpg' } })
+    assert.equal(res.status, 201)
+    assert.equal((await api('/menu')).body.items.find((i) => i.id === 'nasty').name, nasty)
+    await api('/admin/menu-items/nasty', { method: 'DELETE', admin: true })
+    assert.ok(srv.alive())
+  })
+})
+
+describe('kitchen notes, dish notes and the call-waiter button', () => {
+  it('an order keeps the customer note, and extra dishes add to it', async () => {
+    const r = await api('/orders', { method: 'POST', body: { tableId: '1', items: [line(0)], note: '  no onions please  ' } })
+    assert.equal(r.status, 201)
+    assert.equal(r.body.note, 'no onions please')
+
+    const more = await api(`/orders/${r.body.id}/items`, { method: 'POST', body: { items: [line(1)], note: 'extra spicy' } })
+    assert.equal(more.status, 200)
+    assert.equal(more.body.note, 'no onions please\nextra spicy')
+
+    // The dashboard sees it too.
+    const admin = await api(`/admin/orders/${r.body.id}`, { admin: true })
+    assert.equal(admin.body.note, 'no onions please\nextra spicy')
+    await api(`/admin/orders/${r.body.id}/status`, { method: 'PATCH', admin: true, body: { status: 'completed' } })
+  })
+
+  it('an order without a note has an empty note; bad notes are refused (400, never 500)', async () => {
+    const r = await place('2', [line(0)])
+    assert.equal(r.status, 201)
+    assert.equal(r.body.note, '')
+    await api(`/admin/orders/${r.body.id}/status`, { method: 'PATCH', admin: true, body: { status: 'completed' } })
+
+    for (const note of ['x'.repeat(301), { a: 1 }, 5, ['hi'], 'bad\u0000text']) {
+      const res = await api('/orders', { method: 'POST', body: { tableId: '3', items: [line(0)], note } })
+      assert.equal(res.status, 400, JSON.stringify(note).slice(0, 40))
+    }
+    // 300 characters is allowed.
+    const ok = await place('3', [line(0)])
+    assert.equal(ok.status, 201)
+    await api(`/admin/orders/${ok.body.id}/status`, { method: 'PATCH', admin: true, body: { status: 'completed' } })
+  })
+
+  it('a dish note can be set, edited, cleared and is shown on the public menu', async () => {
+    const cats = (await api('/admin/categories', { admin: true })).body
+    const created = await api('/admin/menu-items', {
+      method: 'POST', admin: true,
+      body: { categoryId: cats[0].id, name: 'Noted Dish', price: 40, image: '/logo.png', description: 'Fresh basil, slow-cooked sauce' },
+    })
+    assert.equal(created.status, 201)
+    assert.equal(created.body.description, 'Fresh basil, slow-cooked sauce')
+
+    const menu = await api('/menu')
+    assert.equal(menu.body.items.find((i) => i.id === created.body.id).description, 'Fresh basil, slow-cooked sauce')
+
+    // Changing only the price keeps the note; sending '' clears it.
+    const price = await api(`/admin/menu-items/${created.body.id}`, { method: 'PUT', admin: true, body: { price: 45 } })
+    assert.equal(price.body.description, 'Fresh basil, slow-cooked sauce')
+    const cleared = await api(`/admin/menu-items/${created.body.id}`, { method: 'PUT', admin: true, body: { description: '' } })
+    assert.equal(cleared.body.description, '')
+
+    for (const description of ['x'.repeat(121), { a: 1 }, 7]) {
+      const bad = await api(`/admin/menu-items/${created.body.id}`, { method: 'PUT', admin: true, body: { description } })
+      assert.equal(bad.status, 400, JSON.stringify(description).slice(0, 30))
+    }
+    await api(`/admin/menu-items/${created.body.id}`, { method: 'DELETE', admin: true })
+  })
+
+  it('call waiter: one open call per table, the dashboard sees it, answering closes it', async () => {
+    const first = await api('/waiter-calls', { method: 'POST', body: { tableId: '4' } })
+    assert.equal(first.status, 201)
+    // Tapping again (or two phones at once) gives the SAME call.
+    const [again, again2] = await Promise.all([
+      api('/waiter-calls', { method: 'POST', body: { tableId: '4' } }),
+      api('/waiter-calls', { method: 'POST', body: { tableId: '4' } }),
+    ])
+    assert.equal(again.body.id, first.body.id)
+    assert.equal(again2.body.id, first.body.id)
+
+    assert.equal((await api(`/waiter-calls/${first.body.id}`)).body.resolved, false)
+
+    const list = await api('/admin/waiter-calls', { admin: true })
+    assert.equal(list.body.filter((c) => c.tableId === '4').length, 1)
+    const summary = await api('/admin/summary', { admin: true })
+    assert.ok(summary.body.waiterCalls.some((c) => c.id === first.body.id))
+
+    assert.equal((await api(`/admin/waiter-calls/${first.body.id}/resolve`, { method: 'PATCH', admin: true })).status, 200)
+    assert.equal((await api(`/waiter-calls/${first.body.id}`)).body.resolved, true)
+    // Answering twice is harmless.
+    assert.equal((await api(`/admin/waiter-calls/${first.body.id}/resolve`, { method: 'PATCH', admin: true })).status, 200)
+    assert.equal((await api('/admin/waiter-calls', { admin: true })).body.filter((c) => c.tableId === '4').length, 0)
+
+    // After it was answered the table can call again (a NEW call).
+    const next = await api('/waiter-calls', { method: 'POST', body: { tableId: '4' } })
+    assert.equal(next.status, 201)
+    assert.notEqual(next.body.id, first.body.id)
+    await api(`/admin/waiter-calls/${next.body.id}/resolve`, { method: 'PATCH', admin: true })
+  })
+
+  it('call waiter: refuses bad input and the To Home link, and the dashboard side needs the password', async () => {
+    for (const body of [{}, { tableId: '' }, { tableId: { a: 1 } }, { tableId: 'nope' }, { tableId: 'home' }]) {
+      const res = await api('/waiter-calls', { method: 'POST', body })
+      assert.equal(res.status, 400, JSON.stringify(body))
+    }
+    assert.equal((await api('/waiter-calls/abc')).status, 404)
+    assert.equal((await api('/waiter-calls/999999')).status, 404)
+    assert.equal((await api('/admin/waiter-calls')).status, 401)
+    assert.equal((await api('/admin/waiter-calls/1/resolve', { method: 'PATCH' })).status, 401)
+  })
+})
+
+describe('tables that are being cleaned or out of service', () => {
+  const setStatus = (id, status) => api(`/admin/tables/${id}`, { method: 'PATCH', admin: true, body: { status } })
+  // A brand-new table, so no order left over from other tests is open on it.
+  before(async () => {
+    assert.equal((await api('/admin/tables', { method: 'POST', admin: true, body: { id: 'clean1', seats: 2 } })).status, 201)
+  })
+
+  it('the public table answer says why customers cannot order, and it clears again', async () => {
+    assert.equal((await api('/tables/clean1')).body.unavailable, null)
+
+    await setStatus('clean1', 'cleaning')
+    assert.equal((await api('/tables/clean1')).body.unavailable, 'cleaning')
+    await setStatus('clean1', 'out_of_service')
+    assert.equal((await api('/tables/clean1')).body.unavailable, 'out_of_service')
+    await setStatus('clean1', 'auto')
+    assert.equal((await api('/tables/clean1')).body.unavailable, null)
+  })
+
+  it('new orders are refused for such a table (409), other tables are not affected', async () => {
+    for (const status of ['cleaning', 'out_of_service']) {
+      await setStatus('clean1', status)
+      const refused = await place('clean1', [line(0)])
+      assert.equal(refused.status, 409, status)
+      assert.match(refused.body.error, status === 'cleaning' ? /cleaned/ : /out of service/)
+      // another table still works
+      const ok = await place('4', [line(0)])
+      assert.equal(ok.status, 201)
+      await api(`/admin/orders/${ok.body.id}/status`, { method: 'PATCH', admin: true, body: { status: 'completed' } })
+    }
+    await setStatus('clean1', 'auto')
+    const back = await place('clean1', [line(0)])
+    assert.equal(back.status, 201)
+    await api(`/admin/orders/${back.body.id}/status`, { method: 'PATCH', admin: true, body: { status: 'completed' } })
+  })
+
+  it('a table "being cleaned" that has guests with an open order keeps serving them', async () => {
+    const order = await place('3', [line(0)])
+    assert.equal(order.status, 201)
+    await setStatus('3', 'cleaning')
+    assert.equal((await api('/tables/3')).body.unavailable, null)
+    assert.equal((await api(`/orders/${order.body.id}/items`, { method: 'POST', body: { items: [line(1)] } })).status, 200)
+
+    // Out of service always wins.
+    await setStatus('3', 'out_of_service')
+    assert.equal((await api('/tables/3')).body.unavailable, 'out_of_service')
+
+    await setStatus('3', 'auto')
+    await api(`/admin/orders/${order.body.id}/status`, { method: 'PATCH', admin: true, body: { status: 'completed' } })
+  })
+
+  it('the To Home link is never "unavailable"', async () => {
+    assert.equal((await api('/tables/home')).body.unavailable, null)
+  })
+})
+
+describe('admin: reports by date', () => {
+  const report = (query = '') => api(`/admin/reports${query}`, { admin: true })
+
+  it('last 7 days: seven daily points, totals match the orders, best sellers listed', async () => {
+    const r = await report('?range=week')
+    assert.equal(r.status, 200)
+    assert.equal(r.body.granularity, 'day')
+    assert.equal(r.body.series.length, 7)
+    assert.equal(r.body.series.at(-1).key, r.body.today)
+    assert.equal(r.body.to, r.body.today)
+    // the chart and the totals tell the same story
+    assert.equal(r.body.series.reduce((n, p) => n + p.orders, 0), r.body.current.orders)
+    assert.equal(r.body.series.reduce((n, p) => n + p.revenue, 0), r.body.current.revenue)
+    assert.ok(r.body.current.orders > 0 && r.body.current.revenue > 0)
+    assert.ok(r.body.bestSellers.length > 0 && r.body.bestSellers.length <= 10)
+    // best first
+    const q = r.body.bestSellers.map((b) => b.quantity)
+    assert.deepEqual(q, [...q].sort((a, b) => b - a))
+  })
+
+  it('today is hourly (24 points); yesterday, month, lastmonth, last30 answer', async () => {
+    const today = await report('?range=today')
+    assert.equal(today.body.granularity, 'hour')
+    assert.equal(today.body.series.length, 24)
+    assert.equal(today.body.from, today.body.to)
+
+    for (const range of ['yesterday', 'month', 'lastmonth', 'last30']) {
+      const r = await report(`?range=${range}`)
+      assert.equal(r.status, 200, range)
+      assert.ok(r.body.from <= r.body.to, range)
+    }
+    assert.equal((await report('?range=last30')).body.series.length, 30)
+    const month = await report('?range=month')
+    assert.equal(month.body.from.slice(8), '01')
+    assert.equal(month.body.to, month.body.today)
+  })
+
+  it('cancelled orders are not sales, but are counted as cancelled', async () => {
+    const before = (await report('?range=today')).body
+    const order = await place('2', [line(0, 3)])
+    assert.equal(order.status, 201)
+    const during = (await report('?range=today')).body
+    assert.equal(during.current.orders, before.current.orders + 1)
+    assert.equal(during.current.revenue, before.current.revenue + order.body.total)
+
+    await api(`/admin/orders/${order.body.id}/status`, { method: 'PATCH', admin: true, body: { status: 'cancelled' } })
+    const after = (await report('?range=today')).body
+    assert.equal(after.current.orders, before.current.orders)
+    assert.equal(after.current.revenue, before.current.revenue)
+    assert.equal(after.current.cancelled, before.current.cancelled + 1)
+  })
+
+  it('custom dates work, the future is cut off, and bad input is a 400 (never a 500)', async () => {
+    const { today } = (await report('?range=today')).body
+    const ok = await report(`?range=custom&from=${today}&to=${today}`)
+    assert.equal(ok.status, 200)
+    assert.equal(ok.body.granularity, 'hour')
+
+    const future = await report(`?range=custom&from=2020-01-01&to=2999-12-31`)
+    assert.equal(future.status, 400) // longer than a year
+    const cut = await report(`?range=custom&from=${today}&to=2999-12-31`)
+    assert.equal(cut.body.to, today)
+
+    for (const q of [
+      '?range=nope', '?range=custom', '?range=custom&from=2026-10-01', '?range=custom&from=bad&to=worse',
+      '?range=custom&from=2026-02-31&to=2026-03-01', '?range=custom&from=2026-10-10&to=2026-10-01',
+      '?range=custom&from=2020-01-01&to=2026-01-01', '?range=week&range=today',
+      '?range=custom&from[]=x&to=2026-10-01',
+    ]) {
+      const r = await report(q)
+      assert.equal(r.status, 400, q)
+    }
+  })
+})
+
+describe('alerts when the dashboard is closed (Web Push)', () => {
+  const sub = { endpoint: 'https://push.invalid/abc', keys: { p256dh: 'BPk', auth: 'au' } }
+
+  it('needs the staff password', async () => {
+    assert.equal((await api('/admin/push/key')).status, 401)
+    assert.equal((await api('/admin/push/subscribe', { method: 'POST', body: sub })).status, 401)
+  })
+
+  it('gives a stable public key', async () => {
+    const a = await api('/admin/push/key', { admin: true })
+    const b = await api('/admin/push/key', { admin: true })
+    assert.equal(a.status, 200)
+    assert.ok(a.body.publicKey.length > 40)
+    assert.equal(a.body.publicKey, b.body.publicKey)
+  })
+
+  it('rejects a broken subscription, accepts a good one twice (no duplicates)', async () => {
+    for (const body of [{}, { endpoint: 'http://insecure', keys: sub.keys }, { endpoint: sub.endpoint }, { endpoint: sub.endpoint, keys: { p256dh: 1, auth: 2 } }]) {
+      assert.equal((await api('/admin/push/subscribe', { method: 'POST', body, admin: true })).status, 400)
+    }
+    assert.equal((await api('/admin/push/subscribe', { method: 'POST', body: sub, admin: true })).status, 201)
+    assert.equal((await api('/admin/push/subscribe', { method: 'POST', body: sub, admin: true })).status, 201)
+    const db = new pg.Client({ connectionString: TEST_DB })
+    await db.connect()
+    const n = (await db.query('SELECT COUNT(*)::int AS n FROM push_subscriptions WHERE endpoint = $1', [sub.endpoint])).rows[0].n
+    await db.end()
+    assert.equal(n, 1)
+  })
+
+  it('an order and a waiter call still work when the push service is unreachable', async () => {
+    const r = await place('2', [line(0)])
+    assert.equal(r.status, 201)
+    const call = await api('/waiter-calls', { method: 'POST', body: { tableId: '4' } })
+    assert.equal(call.status, 201)
+  })
+
+  it('can be turned off', async () => {
+    assert.equal((await api('/admin/push/unsubscribe', { method: 'POST', body: { endpoint: sub.endpoint }, admin: true })).status, 200)
+  })
+})
+
+describe('admin: a waiter places an order from the dashboard', () => {
+  const staffOrder = (body) => api('/admin/orders', { method: 'POST', admin: true, body })
+  const finish = (id, status = 'completed') => api(`/admin/orders/${id}/status`, { method: 'PATCH', admin: true, body: { status } })
+
+  it('creates a normal order: kitchen status, daily number, note, total from the SERVER prices', async () => {
+    const before = await place('1', [line(0)])
+    await finish(before.body.id)
+
+    const res = await staffOrder({
+      tableId: '1',
+      // a lie about the price must be ignored
+      items: [{ id: dishes[0].id, quantity: 2, unitPrice: 1, price: 1, name: 'Free food' }, { id: dishes[1].id, quantity: 1 }],
+      note: 'no onions',
+    })
+    assert.equal(res.status, 201)
+    assert.equal(res.body.status, 'preparing')
+    assert.equal(res.body.note, 'no onions')
+    assert.equal(res.body.number, before.body.number + 1) // same numbering as customer orders
+    assert.notEqual(res.body.items[0].name, 'Free food')
+    const priceOf = (d) => (d.discountPercent ? Math.round(d.price * (1 - d.discountPercent / 100)) : d.price)
+    assert.equal(res.body.total, priceOf(dishes[0]) * 2 + priceOf(dishes[1]))
+
+    // it shows up in the dashboard orders, like any other
+    const list = await api('/admin/orders', { admin: true })
+    assert.ok(list.body.orders.some((o) => o.id === res.body.id && o.status === 'preparing'))
+    // and the customer's phone can follow it too
+    assert.equal((await api(`/orders/${res.body.id}`)).body.id, res.body.id)
+    await finish(res.body.id)
+  })
+
+  it('works for the To Home link too', async () => {
+    const res = await staffOrder({ tableId: 'home', items: [{ id: dishes[0].id, quantity: 1 }] })
+    assert.equal(res.status, 201)
+    assert.equal(res.body.tableId, 'home')
+    await finish(res.body.id)
+  })
+
+  it('refuses a wrong table, a dish that is gone/unavailable, empty or silly orders (400, never 500)', async () => {
+    const ok = [{ id: dishes[0].id, quantity: 1 }]
+    for (const body of [
+      {}, { items: ok }, { tableId: 'nope', items: ok }, { tableId: '1' }, { tableId: '1', items: [] },
+      { tableId: '1', items: [{ id: 'ghost', quantity: 1 }] }, { tableId: '1', items: [{ id: dishes[0].id, quantity: 0 }] },
+      { tableId: '1', items: [{ id: dishes[0].id, quantity: 1000 }] }, { tableId: '1', items: 'x' },
+      { tableId: '1', items: ok, note: 'x'.repeat(301) }, { tableId: { a: 1 }, items: ok },
+    ]) {
+      const res = await staffOrder(body)
+      assert.equal(res.status, 400, JSON.stringify(body).slice(0, 60))
+    }
+
+    await api(`/admin/menu-items/${dishes[2].id}`, { method: 'PUT', admin: true, body: { available: false } })
+    const gone = await staffOrder({ tableId: '1', items: [{ id: dishes[2].id, quantity: 1 }] })
+    assert.equal(gone.status, 400)
+    assert.match(gone.body.error, /not available/)
+    await api(`/admin/menu-items/${dishes[2].id}`, { method: 'PUT', admin: true, body: { available: true } })
+  })
+
+  it('a table that is out of service is refused (409), and fine again once reopened', async () => {
+    await api('/admin/tables', { method: 'POST', admin: true, body: { id: 'staff1', seats: 2 } })
+    await api('/admin/tables/staff1', { method: 'PATCH', admin: true, body: { status: 'out_of_service' } })
+    const refused = await staffOrder({ tableId: 'staff1', items: [{ id: dishes[0].id, quantity: 1 }] })
+    assert.equal(refused.status, 409)
+
+    await api('/admin/tables/staff1', { method: 'PATCH', admin: true, body: { status: 'auto' } })
+    const ok = await staffOrder({ tableId: 'staff1', items: [{ id: dishes[0].id, quantity: 1 }] })
+    assert.equal(ok.status, 201)
+    await finish(ok.body.id)
+  })
+
+  it('ten orders at once all get different numbers', async () => {
+    const results = await Promise.all(
+      Array.from({ length: 10 }, (_, i) => staffOrder({ tableId: String((i % 5) + 1), items: [{ id: dishes[0].id, quantity: 1 }] })),
+    )
+    assert.ok(results.every((r) => r.status === 201))
+    assert.equal(new Set(results.map((r) => r.body.number)).size, 10)
+    for (const r of results) await finish(r.body.id)
+  })
+})
+
+describe('server health after all of the above', () => {
+  it('is still running and answering', async () => {
+    assert.ok(srv.alive())
+    assert.equal((await api('/health')).status, 200)
+  })
+})
+
+describe('picture uploads and dish creation without an id', () => {
+  // A tiny but REAL 1x1 PNG and JPEG
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+  const up = (body, type, opts = {}) =>
+    fetch(`${srv.base}/admin/uploads`, { method: 'POST', headers: { 'content-type': type, ...(opts.noAuth ? {} : { 'x-admin-password': ADMIN_PASSWORD }) }, body })
+
+  it('creates a dish with NO id (the dashboard form never sends one) and different ids for equal names', async () => {
+    const cat = (await api('/admin/categories', { admin: true })).body[0].id
+    const a = await api('/admin/menu-items', { method: 'POST', admin: true, body: { categoryId: cat, name: 'Spicy Burger', price: 300, image: '/logo.png' } })
+    const b = await api('/admin/menu-items', { method: 'POST', admin: true, body: { categoryId: cat, name: 'Spicy Burger', price: 300, image: '/logo.png' } })
+    const arabic = await api('/admin/menu-items', { method: 'POST', admin: true, body: { categoryId: cat, name: 'طبق جديد', price: 300, image: '/logo.png' } })
+    assert.equal(a.status, 201, a.text)
+    assert.equal(b.status, 201, b.text)
+    assert.equal(arabic.status, 201, arabic.text)
+    assert.match(a.body.id, /^spicy-burger-/)
+    assert.notEqual(a.body.id, b.body.id)
+    for (const d of [a, b, arabic]) await api(`/admin/menu-items/${d.body.id}`, { method: 'DELETE', admin: true })
+  })
+
+  it('stores a real picture, serves it back with the right headers, and a dish can use it', async () => {
+    const res = await up(PNG, 'image/png')
+    assert.equal(res.status, 201)
+    const { image } = await res.json()
+    assert.match(image, /^\/uploads\/\d+$/)
+    const got = await fetch(`${srv.base}${image}`)
+    assert.equal(got.status, 200)
+    assert.equal(got.headers.get('content-type'), 'image/png')
+    assert.match(got.headers.get('cache-control'), /immutable/)
+    assert.equal(got.headers.get('x-content-type-options'), 'nosniff')
+    assert.deepEqual(Buffer.from(await got.arrayBuffer()), PNG)
+
+    const cat = (await api('/admin/categories', { admin: true })).body[0].id
+    const dish = await api('/admin/menu-items', { method: 'POST', admin: true, body: { categoryId: cat, name: 'Photo dish', price: 100, image } })
+    assert.equal(dish.body.image, image)
+    // deleting the dish frees the picture
+    await api(`/admin/menu-items/${dish.body.id}`, { method: 'DELETE', admin: true })
+    assert.equal((await fetch(`${srv.base}${image}`)).status, 404)
+  })
+
+  it('replacing a dish picture frees the old upload but keeps a shared one', async () => {
+    const cat = (await api('/admin/categories', { admin: true })).body[0].id
+    const first = (await (await up(PNG, 'image/png')).json()).image
+    const second = (await (await up(PNG, 'image/png')).json()).image
+    const x = (await api('/admin/menu-items', { method: 'POST', admin: true, body: { categoryId: cat, name: 'X', price: 1, image: first } })).body
+    const y = (await api('/admin/menu-items', { method: 'POST', admin: true, body: { categoryId: cat, name: 'Y', price: 1, image: first } })).body
+    await api(`/admin/menu-items/${x.id}`, { method: 'PUT', admin: true, body: { image: second } })
+    assert.equal((await fetch(`${srv.base}${first}`)).status, 200, 'still used by Y — must not be deleted')
+    await api(`/admin/menu-items/${y.id}`, { method: 'PUT', admin: true, body: { image: second } })
+    assert.equal((await fetch(`${srv.base}${first}`)).status, 404, 'unused now — must be deleted')
+    for (const d of [x, y]) await api(`/admin/menu-items/${d.id}`, { method: 'DELETE', admin: true })
+  })
+
+  it('refuses everything that is not a genuine picture', async () => {
+    assert.equal((await up(PNG, 'image/png', { noAuth: true })).status, 401)
+    assert.equal((await up('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>', 'image/svg+xml')).status, 400)
+    assert.equal((await up('<html><script>alert(1)</script></html>', 'image/png')).status, 400) // lies about its type
+    assert.equal((await up(PNG, 'image/jpeg')).status, 400) // PNG bytes labelled JPEG
+    assert.equal((await up(Buffer.alloc(0), 'image/png')).status, 400)
+    assert.equal((await up('hello world, plain text', 'text/plain')).status, 400)
+    assert.equal((await up(PNG, 'application/json')).status, 400)
+    assert.equal((await up(Buffer.concat([PNG, Buffer.alloc(5 * 1024 * 1024)]), 'image/png')).status, 413)
+    for (const id of ['abc', '0', '999999', '-1', '1.5', '%00']) {
+      const r = await fetch(`${srv.base}/uploads/${id}`)
+      assert.equal(r.status, 404, `GET /uploads/${id} -> ${r.status}`)
+    }
+    assert.ok(srv.alive())
+  })
+})
+
+// The "#22" that staff and customer both see: one number per order, counting up
+// during the day and starting again at 1 after midnight.
+describe('order numbers (#1, #2, ... restart every day)', () => {
+  const runSql = async (sql) => {
+    const isLocal = /localhost|127\.0\.0\.1/.test(TEST_DB)
+    const client = new pg.Client({ connectionString: TEST_DB, ssl: isLocal ? false : { rejectUnauthorized: false } })
+    await client.connect()
+    try { return await client.query(sql) } finally { await client.end() }
+  }
+
+  it('counts up one by one, and the customer and the dashboard see the same number', async () => {
+    const a = (await place('1', [line()])).body
+    const b = (await place('2', [line()])).body
+    const c = (await place('3', [line()])).body
+    assert.equal(b.number, a.number + 1)
+    assert.equal(c.number, b.number + 1)
+
+    // what the customer's phone polls
+    assert.equal((await api(`/orders/${b.id}`)).body.number, b.number)
+    // what the dashboard lists
+    const list = (await api('/admin/orders?range=today', { admin: true })).body.orders
+    assert.equal(list.find((o) => o.id === b.id).number, b.number)
+    // adding dishes to the order keeps its number
+    const more = await api(`/orders/${b.id}/items`, { method: 'POST', body: { items: [line(1)] } })
+    assert.equal(more.body.number, b.number)
+  })
+
+  it('never gives two orders the same number, even when 40 customers order at the same moment', async () => {
+    const results = await Promise.all(Array.from({ length: 40 }, (_, i) => place(String((i % 5) + 1), [line()])))
+    assert.ok(results.every((r) => r.status === 201), 'every order must be accepted')
+    const numbers = results.map((r) => r.body.number).sort((x, y) => x - y)
+    assert.equal(new Set(numbers).size, 40, 'duplicate order numbers')
+    assert.equal(numbers[39] - numbers[0], 39, 'numbers must follow each other without gaps')
+  })
+
+  it('starts again at 1 on a new day, and keeps old orders\' numbers', async () => {
+    const before = (await place('1', [line()])).body
+    assert.ok(before.number > 1)
+
+    // pretend midnight just passed: everything placed so far now belongs to yesterday
+    await runSql('UPDATE orders SET order_day = order_day - 1')
+
+    const first = (await place('1', [line()])).body
+    const second = (await place('2', [line()])).body
+    assert.equal(first.number, 1)
+    assert.equal(second.number, 2)
+
+    // the order from "yesterday" kept its own number
+    assert.equal((await api(`/orders/${before.id}`)).body.number, before.number)
+    // the database id is still unique and unchanged: it is not what resets
+    assert.ok(first.id > before.id)
+  })
+
+  it('a cancelled order does not free its number, and a rejected order does not use one', async () => {
+    const x = (await place('1', [line()])).body
+    await api(`/orders/${x.id}/cancel`, { method: 'PATCH' })
+    const rejected = await place('1', [{ id: 'no-such-dish', quantity: 1 }])
+    assert.equal(rejected.status, 400)
+    const y = (await place('1', [line()])).body
+    assert.equal(y.number, x.number + 1)
+  })
+})

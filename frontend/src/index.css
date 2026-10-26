@@ -1,0 +1,188 @@
+@import "tailwindcss";
+
+/* Self-hosted fonts (via @fontsource) so the menu still renders correctly
+   with no internet connection once this is deployed inside a restaurant. */
+@import "@fontsource/anton/400.css";
+@import "@fontsource/poppins/400.css";
+@import "@fontsource/poppins/500.css";
+@import "@fontsource/poppins/600.css";
+@import "@fontsource/poppins/700.css";
+@import "@fontsource/poppins/800.css";
+/* Dashboard fonts: Inter for everything, Caveat for the handwritten taglines */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/caveat/600.css";
+/* Arabic (also covers Latin letters, so mixed text looks consistent) */
+@import "@fontsource/cairo/400.css";
+@import "@fontsource/cairo/500.css";
+@import "@fontsource/cairo/600.css";
+@import "@fontsource/cairo/700.css";
+
+/* Phones with a short screen (iPhone SE and similar, 740px tall or less).
+   Used as "short:" in class names. Taller phones (iPhone 16...) are untouched. */
+@custom-variant short {
+  @media (max-height: 740px) {
+    @slot;
+  }
+  @media (min-width: 640px) and (max-height: 900px) {
+    @slot;
+  }
+}
+/* Very small phones (iPhone 5 / old Android, 600px tall or less) */
+@custom-variant tiny (@media (max-height: 600px));
+
+@theme {
+  --font-display: "Anton", sans-serif;
+  --font-sans: "Poppins", sans-serif;
+
+  --color-ink: #0b0b0c;
+  --color-panel: #1a1a1c;
+  --color-panel-light: #232325;
+  --color-maroon: #8a1014;
+  --color-maroon-bright: #b3181c;
+  --color-maroon-soft: #5c0d10;
+  --color-cream: #f6f4f0;
+  --color-line: #3a3a3d;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-ink);
+  color: var(--color-cream);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+/* Horizontally-scrolling rows (categories) with no visible scrollbar */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   STAFF DASHBOARD THEME
+
+   Everything under /admin wears these colors (black + red), so the customer
+   menu keeps its own look. All dashboard pages use the same color names
+   (ink, panel, line, maroon, cream), so changing the values below recolors
+   the whole dashboard at once.
+   ------------------------------------------------------------------------- */
+.admin-theme {
+  --color-ink: #09090b;
+  --color-panel: #0f0f12;
+  --color-panel-light: #17171b;
+  --color-line: #232328;
+  --color-cream: #f5f5f6;
+
+  --color-maroon: #d9151f;
+  --color-maroon-bright: #f0222c;
+  --color-maroon-soft: #5a0b10;
+
+  font-family: "Inter", "Poppins", system-ui, sans-serif;
+}
+
+.admin-theme .font-script {
+  font-family: "Caveat", cursive;
+  font-weight: 600;
+}
+
+/* Thin dark scrollbars inside dashboard panels */
+.admin-theme * {
+  scrollbar-width: thin;
+  scrollbar-color: #2a2a30 transparent;
+}
+
+/* Form fields used by the dashboard dialogs */
+.admin-theme .input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-panel-light);
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  color: var(--color-cream);
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.admin-theme .input::placeholder {
+  color: rgb(245 245 246 / 0.3);
+}
+.admin-theme .input:focus {
+  border-color: rgb(240 34 44 / 0.7);
+}
+
+/* The "Call waiter" bell gives a small shake now and then so it is easy to spot. */
+@keyframes wiggle {
+  0%, 82%, 100% { transform: rotate(0deg); }
+  86% { transform: rotate(-16deg); }
+  90% { transform: rotate(14deg); }
+  94% { transform: rotate(-10deg); }
+  98% { transform: rotate(6deg); }
+}
+
+@keyframes admin-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.admin-theme .fade-up {
+  animation: admin-fade-up 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* No sideways scrolling anywhere on the page. (The category strip on the
+   customer menu still swipes inside its own box — it has to, to reach every
+   category on a narrow phone.) */
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+.admin-theme {
+  overflow-x: clip;
+}
+
+/* -------------------------------------------------------------------------
+   ARABIC / RIGHT-TO-LEFT
+   <html lang="ar" dir="rtl"> is set by the language provider. Layouts mirror
+   through direction-aware classes (start/end, ms/me, rtl:...). Here: an Arabic
+   font, and no letter-spacing (spacing letters breaks Arabic's joined script).
+   ------------------------------------------------------------------------- */
+html[lang="ar"] body,
+html[lang="ar"] .admin-theme,
+html[lang="ar"] .font-display {
+  font-family: "Cairo", "Noto Sans Arabic", system-ui, sans-serif;
+}
+html[lang="ar"] .font-display {
+  font-weight: 700;
+  letter-spacing: normal;
+}
+html[lang="ar"] * {
+  letter-spacing: normal !important;
+}

@@ -1,0 +1,23 @@
+{
+  "name": "meet-the-chefs-backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node src/seed.js",
+    "test": "node --test --test-concurrency=1 tests/*.test.js"
+  },
+  "dependencies": {
+    "compression": "^1.8.2",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.0",
+    "express": "^5.2.1",
+    "pg": "^8.23.0",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
