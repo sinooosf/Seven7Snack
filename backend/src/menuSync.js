@@ -1,16 +1,25 @@
 // ---------------------------------------------------------------------------
-// Makes the database menu match menuData.js. Runs every time the server
-// starts (and from `npm run seed`), so the menu is always "in the code" and
-// never has to be added from the dashboard.
+// Loads the starting menu from menuData.js into the database. Runs every time
+// the server starts (and from `npm run seed`).
 //
-//   - Categories and dishes that are in menuData.js are added or updated
-//     (name, picture, category and position come from the file).
-//   - Categories and dishes that are NOT in the file are removed — that is how
-//     the old menu disappears. Past orders are unaffected: order_items keeps
-//     its own copy of each dish's name and price.
-//   - price / discount / available / "best" are only set when a dish is first
-//     added. After that the dashboard owns them, so marking a dish
-//     unavailable survives a restart.
+// WHO OWNS WHAT
+//
+//   CATEGORIES — the dashboard owns them (Menu -> Categories: rename, change
+//     the picture, move first/last, remove, add). menuData.js only SEEDS them:
+//       * a category that is in the file but not in the database yet is added
+//         (at the end of the list);
+//       * a category that already exists is left exactly as the staff made it —
+//         its name, picture and position are never overwritten;
+//       * a category the staff REMOVED stays removed: its id is remembered
+//         (see removeCategoryMark) so the next restart does not bring it back;
+//       * categories that are not in the file (made from the dashboard) are
+//         never deleted by the sync.
+//
+//   DISHES — the dashboard owns them too (add, edit, move, remove). menuData.js
+//     only SEEDS them: a dish that is in the file but not in the database yet
+//     is added; an existing dish is never overwritten; a dish the staff
+//     removed stays removed (its id is remembered); dishes made from the
+//     dashboard are never deleted by the sync.
 // ---------------------------------------------------------------------------
 import { pool } from './db.js'
 import { CATEGORIES, MENU_ITEMS } from './menuData.js'
@@ -18,45 +27,107 @@ import { CATEGORIES, MENU_ITEMS } from './menuData.js'
 // Any number; makes two servers starting at the same moment take turns.
 const LOCK_KEY = 70707
 
+const REMOVED_KEY = 'removed_categories'
+
+// The ids of the categories the staff removed from the dashboard.
+export async function removedCategoryIds(db = pool) {
+  const result = await db.query('SELECT value FROM app_settings WHERE key = $1', [REMOVED_KEY])
+  try {
+    const parsed = JSON.parse(result.rows[0]?.value || '[]')
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+async function saveRemoved(db, ids) {
+  await db.query(
+    `INSERT INTO app_settings (key, value) VALUES ($1, $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [REMOVED_KEY, JSON.stringify([...new Set(ids)])],
+  )
+}
+
+// Remember that the staff removed this category, so the sync keeps it removed.
+export async function markCategoryRemoved(db, id) {
+  await saveRemoved(db, [...(await removedCategoryIds(db)), id])
+}
+
+// The staff made a category with this id again: let the sync know it is wanted.
+export async function unmarkCategoryRemoved(db, id) {
+  const ids = await removedCategoryIds(db)
+  if (ids.includes(id)) await saveRemoved(db, ids.filter((other) => other !== id))
+}
+
+const REMOVED_ITEMS_KEY = 'removed_menu_items'
+
+async function readIdList(db, key) {
+  const result = await db.query('SELECT value FROM app_settings WHERE key = $1', [key])
+  try {
+    const parsed = JSON.parse(result.rows[0]?.value || '[]')
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+// The ids of the starting dishes the staff removed from the dashboard.
+export const removedItemIds = (db = pool) => readIdList(db, REMOVED_ITEMS_KEY)
+
+// Remember that the staff removed this dish, so the sync keeps it removed.
+// (Only ids that come from menuData.js matter; others are simply ignored.)
+export async function markItemRemoved(db, id) {
+  if (!MENU_ITEMS.some((item) => item.id === id)) return
+  const ids = await removedItemIds(db)
+  await db.query(
+    `INSERT INTO app_settings (key, value) VALUES ($1, $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [REMOVED_ITEMS_KEY, JSON.stringify([...new Set([...ids, id])])],
+  )
+}
+
 export async function syncMenu() {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock($1)', [LOCK_KEY])
 
-    for (const [index, c] of CATEGORIES.entries()) {
+    const removed = new Set(await removedCategoryIds(client))
+    const wanted = CATEGORIES.filter((c) => !removed.has(c.id))
+
+    // Categories: add the missing ones at the end, never touch existing ones.
+    for (const c of wanted) {
       await client.query(
         `INSERT INTO categories (id, name, image, description, sort_order)
-         VALUES ($1,$2,$3,$4,$5)
-         ON CONFLICT (id) DO UPDATE
-           SET name = EXCLUDED.name, image = EXCLUDED.image,
-               description = EXCLUDED.description, sort_order = EXCLUDED.sort_order`,
-        [c.id, c.name, c.image, c.description, index],
+         VALUES ($1, $2, $3, $4, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM categories))
+         ON CONFLICT (id) DO NOTHING`,
+        [c.id, c.name, c.image, c.description],
       )
     }
 
-    for (const [index, item] of MENU_ITEMS.entries()) {
+    const wantedIds = new Set(wanted.map((c) => c.id))
+    const removedDishes = new Set(await removedItemIds(client))
+    const items = MENU_ITEMS.filter((item) => wantedIds.has(item.categoryId) && !removedDishes.has(item.id))
+
+    // Dishes: add the missing ones (after the dishes already in their
+    // category), never touch existing ones.
+    for (const item of items) {
       await client.query(
         `INSERT INTO menu_items
            (id, category_id, name, price, image, available, discount_percent, is_best, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-         ON CONFLICT (id) DO UPDATE
-           SET category_id = EXCLUDED.category_id, name = EXCLUDED.name,
-               image = EXCLUDED.image, sort_order = EXCLUDED.sort_order`,
-        [item.id, item.categoryId, item.name, item.price, item.image, item.available, item.discountPercent, item.isBest, index],
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,
+                 (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM menu_items WHERE category_id = $2))
+         ON CONFLICT (id) DO NOTHING`,
+        [item.id, item.categoryId, item.name, item.price, item.image, item.available, item.discountPercent, item.isBest],
       )
     }
 
-    // Everything that is not in the file goes (the old menu).
-    const removedItems = await client.query('DELETE FROM menu_items WHERE id <> ALL($1::text[])', [MENU_ITEMS.map((i) => i.id)])
-    const removedCategories = await client.query('DELETE FROM categories WHERE id <> ALL($1::text[])', [CATEGORIES.map((c) => c.id)])
-
     await client.query('COMMIT')
     return {
-      categories: CATEGORIES.length,
-      items: MENU_ITEMS.length,
-      removedCategories: removedCategories.rowCount,
-      removedItems: removedItems.rowCount,
+      categories: wanted.length,
+      items: items.length,
+      removedCategories: 0,
+      removedItems: 0,
     }
   } catch (err) {
     await client.query('ROLLBACK')
@@ -64,4 +135,28 @@ export async function syncMenu() {
   } finally {
     client.release()
   }
+}
+
+// Brings back every category of menuData.js that the staff removed, together
+// with its starting dishes. Returns { restored: <how many categories> }.
+export async function restoreRemovedCategories() {
+  const before = new Set(await removedCategoryIds(pool))
+  const restoring = CATEGORIES.filter((c) => before.has(c.id))
+  if (before.size > 0) await saveRemoved(pool, [])
+
+  // The starting dishes of those categories were removed one by one when the
+  // category was removed: they come back too.
+  if (restoring.length > 0) {
+    const restoringIds = new Set(restoring.map((c) => c.id))
+    const back = new Set(MENU_ITEMS.filter((item) => restoringIds.has(item.categoryId)).map((item) => item.id))
+    const kept = (await removedItemIds(pool)).filter((id) => !back.has(id))
+    await pool.query(
+      `INSERT INTO app_settings (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [REMOVED_ITEMS_KEY, JSON.stringify(kept)],
+    )
+  }
+
+  await syncMenu()
+  return { restored: restoring.length }
 }

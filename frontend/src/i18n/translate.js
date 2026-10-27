@@ -78,9 +78,9 @@ export function formatTime(code, date) {
   })
 }
 
-// What to call a table on screen: "Table 4" / "Table 4" / "طاولة 4" / "To Home".
+// What to call a table on screen: "Table 4" / "Table 4" / "طاولة 4" / "To Home" / "Delivery".
 export function tableLabelFor(code, tableId) {
-  return String(tableId) === 'home'
-    ? translate(code, 'common.toHome')
-    : translate(code, 'common.table', { id: tableId })
+  if (String(tableId) === 'home') return translate(code, 'common.toHome')
+  if (String(tableId) === 'delivery') return translate(code, 'common.delivery')
+  return translate(code, 'common.table', { id: tableId })
 }

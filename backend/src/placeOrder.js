@@ -14,7 +14,7 @@ import { pool } from './db.js'
 import { serializeOrder } from './serialize.js'
 import { TZ } from './time.js'
 import { unavailableReason } from './routes/tables.js'
-import { MAX_ORDER_NOTE, cleanNote, normalizeTableId, parseOrderLines } from './validate.js'
+import { MAX_ORDER_NOTE, cleanAddress, cleanNote, cleanPhone, normalizeTableId, parseOrderLines } from './validate.js'
 
 // Orders are numbered one after the other (#1, #2, #3...) and the count starts
 // again at 1 after midnight. Two orders placed at the same instant must never
@@ -41,6 +41,22 @@ export async function placeOrder(body) {
     if (tableCheck.rows.length === 0) {
       await client.query('ROLLBACK').catch(() => {})
       return { status: 400, error: `Unknown table: ${tableId}` }
+    }
+
+    // The delivery link needs a phone number and an address; every other
+    // kind of order ignores them.
+    let phone = ''
+    let address = ''
+    if (tableCheck.rows[0].kind === 'delivery') {
+      const phoneCheck = cleanPhone(body?.phone)
+      const addressCheck = cleanAddress(body?.address)
+      const problem = phoneCheck.error || addressCheck.error
+      if (problem) {
+        await client.query('ROLLBACK').catch(() => {})
+        return { status: 400, error: problem }
+      }
+      phone = phoneCheck.value
+      address = addressCheck.value
     }
 
     // A menu that was already open on a phone (or a dashboard screen) must not
@@ -80,8 +96,8 @@ export async function placeOrder(body) {
     const total = resolvedLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
 
     const orderResult = await client.query(
-      'INSERT INTO orders (table_id, status, total, note) VALUES ($1, $2, $3, $4) RETURNING *',
-      [tableId, 'preparing', total, note.value],
+      'INSERT INTO orders (table_id, status, total, note, phone, address) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [tableId, 'preparing', total, note.value, phone, address],
     )
     let order = orderResult.rows[0]
 

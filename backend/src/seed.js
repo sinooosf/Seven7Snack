@@ -27,7 +27,7 @@ async function seed() {
   const firstRun = rows[0].count === 0
 
   const menu = await syncMenu()
-  console.log(`Menu synced from menuData.js: ${menu.categories} categories, ${menu.items} dishes (removed ${menu.removedCategories} old categories, ${menu.removedItems} old dishes).`)
+  console.log(`Menu synced from menuData.js: ${menu.categories} categories, ${menu.items} dishes (removed ${menu.removedItems} old dishes).`)
 
   if (!firstRun) {
     console.log('Tables and chatbot FAQs already exist \u2014 left as they are.')

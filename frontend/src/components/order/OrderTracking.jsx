@@ -208,6 +208,23 @@ function TrackingSheet({
           </div>
         </div>
 
+        {order.type === 'delivery' && (order.address || order.phone) && (
+          <div className="mt-3 rounded-xl bg-panel-light px-3 py-2 text-xs leading-relaxed text-cream/70">
+            {order.address && (
+              <p>
+                <span className="font-semibold text-cream/85">{t('delivery.to')}: </span>
+                <bdi className="whitespace-pre-line">{order.address}</bdi>
+              </p>
+            )}
+            {order.phone && (
+              <p className={order.address ? 'mt-1' : ''}>
+                <span className="font-semibold text-cream/85">{t('delivery.phone')}: </span>
+                <bdi dir="ltr">{order.phone}</bdi>
+              </p>
+            )}
+          </div>
+        )}
+
         {order.note && (
           <p className="mt-3 rounded-xl bg-panel-light px-3 py-2 text-xs leading-relaxed text-cream/70">
             <span className="font-semibold text-cream/85">{t('note.yours')}: </span>

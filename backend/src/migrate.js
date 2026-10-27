@@ -9,8 +9,9 @@
 // ---------------------------------------------------------------------------
 import { pool } from './db.js'
 import { TZ } from './time.js'
+import { HOME_TABLE_ID, DELIVERY_TABLE_ID } from './links.js'
 
-export const HOME_TABLE_ID = 'home'
+export { HOME_TABLE_ID, DELIVERY_TABLE_ID }
 
 export async function ensureSchema() {
   // Newer table columns
@@ -37,6 +38,35 @@ export async function ensureSchema() {
      ON CONFLICT (id) DO UPDATE SET kind = 'home', label = 'To Home'`,
     [HOME_TABLE_ID],
   )
+
+  // The special "delivery" link: the customer orders normally, then gives a
+  // phone number and an address when confirming.
+  await pool.query(
+    `INSERT INTO restaurant_tables (id, label, kind, seats)
+     VALUES ($1, 'Delivery', 'delivery', 0)
+     ON CONFLICT (id) DO UPDATE SET kind = 'delivery', label = 'Delivery'`,
+    [DELIVERY_TABLE_ID],
+  )
+
+  // Floors of the restaurant ("Ground floor", "Upper floor"...). Every table
+  // belongs to one. Existing tables stay on the ground floor.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS floors (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      sort_order  INTEGER NOT NULL DEFAULT 0
+    );
+    INSERT INTO floors (id, name, sort_order) VALUES ('ground', 'Ground floor', 0)
+      ON CONFLICT (id) DO NOTHING;
+    ALTER TABLE restaurant_tables
+      ADD COLUMN IF NOT EXISTS floor_id TEXT NOT NULL DEFAULT 'ground' REFERENCES floors(id);
+  `)
+
+  // Delivery orders carry the customer's phone number and address.
+  await pool.query(`
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS phone    TEXT NOT NULL DEFAULT '';
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS address  TEXT NOT NULL DEFAULT '';
+  `)
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS uploads (
