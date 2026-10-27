@@ -171,8 +171,8 @@ export default function SalesChart({
         <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full select-none" role="img" aria-label={t('admin.ui.salesChart')}>
           <defs>
             <linearGradient id="sales-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#E8873A" stopOpacity="0.42" />
-              <stop offset="1" stopColor="#E8873A" stopOpacity="0.02" />
+              <stop offset="0" stopColor="#f0222c" stopOpacity="0.42" />
+              <stop offset="1" stopColor="#f0222c" stopOpacity="0.02" />
             </linearGradient>
           </defs>
 
@@ -213,13 +213,13 @@ export default function SalesChart({
           <path
             d={linePath}
             fill="none"
-            stroke="#E8873A"
+            stroke="#f0222c"
             strokeWidth="3"
             strokeLinecap="round"
-            style={{ filter: 'drop-shadow(0 0 8px rgba(232,135,58,0.55))' }}
+            style={{ filter: 'drop-shadow(0 0 8px rgba(240,34,44,0.55))' }}
           />
           {currentPoints.map((p) => (
-            <circle key={p.hour} cx={p.x} cy={p.y} r="3" fill="#E8873A" />
+            <circle key={p.hour} cx={p.x} cy={p.y} r="3" fill="#f0222c" />
           ))}
 
           {/* Hover guide */}
@@ -228,7 +228,7 @@ export default function SalesChart({
               <line x1={hoverX} x2={hoverX} y1={PAD.top} y2={baseline} stroke="#ffffff" strokeOpacity="0.35" strokeDasharray="4 4" />
               <circle cx={hoverX} cy={hoverPrevious.y} r="5.5" fill="#c9c9d0" stroke="#0f0f12" strokeWidth="2" />
               {hoverCurrent && (
-                <circle cx={hoverX} cy={hoverCurrent.y} r="5.5" fill="#E8873A" stroke="#0f0f12" strokeWidth="2" />
+                <circle cx={hoverX} cy={hoverCurrent.y} r="5.5" fill="#f0222c" stroke="#0f0f12" strokeWidth="2" />
               )}
             </g>
           )}
@@ -246,7 +246,7 @@ export default function SalesChart({
             <p className="mb-1.5 text-white/70">{hourLabelLong(hoverHour, lang)}</p>
             {hoverCurrent && (
               <p className="flex items-center gap-2 text-white">
-                <span className="h-2 w-2 rounded-full bg-[#E8873A]" />
+                <span className="h-2 w-2 rounded-full bg-[#f0222c]" />
                 {currentLabel}: {fmt(hoverCurrent.v)}
               </p>
             )}
@@ -260,7 +260,7 @@ export default function SalesChart({
 
       <div className="mt-2 flex items-center gap-6 ps-2 text-[13px] text-white/75">
         <span className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#E8873A]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[#f0222c]" />
           {currentLabel}
         </span>
         <span className="flex items-center gap-2">

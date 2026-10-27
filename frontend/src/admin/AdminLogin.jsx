@@ -94,7 +94,7 @@ export default function AdminLogin() {
             <h1 className="max-w-2xl font-display text-6xl font-semibold leading-[0.95] tracking-tight">
               {t('admin.login.heroLine1')}
               <br />
-              <span className="text-[#D4692A]">
+              <span className="text-[#E50914]">
                 {t('admin.login.heroLine2')}
               </span>
             </h1>
@@ -131,7 +131,7 @@ export default function AdminLogin() {
             <div className="relative overflow-hidden rounded-[32px] border border-white/15 bg-black/45 p-2 shadow-2xl shadow-black/60 backdrop-blur-2xl">
 
               {/* Red top glow */}
-              <div className="absolute left-1/2 top-0 h-1 w-32 -translate-x-1/2 rounded-full bg-[#D4692A] shadow-[0_0_35px_rgba(212,105,42,0.8)]" />
+              <div className="absolute left-1/2 top-0 h-1 w-32 -translate-x-1/2 rounded-full bg-[#E50914] shadow-[0_0_35px_rgba(229,9,20,0.8)]" />
 
               <div className="rounded-[25px] border border-white/[0.06] bg-black/35 p-7 sm:p-9">
 
@@ -140,7 +140,7 @@ export default function AdminLogin() {
 
                   <div className="flex items-center gap-3">
 
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#D4692A] to-[#650000] shadow-lg shadow-red-950/40">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#E50914] to-[#650000] shadow-lg shadow-red-950/40">
                       <Utensils size={20} />
                     </div>
 
@@ -159,7 +159,7 @@ export default function AdminLogin() {
                   <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5">
                     <ShieldCheck
                       size={16}
-                      className="text-[#D4692A]"
+                      className="text-[#E50914]"
                     />
                   </div>
 
@@ -207,7 +207,7 @@ export default function AdminLogin() {
                       placeholder={t('admin.login.placeholder')}
                       autoFocus
                       autoComplete="current-password"
-                      className="h-14 w-full rounded-2xl border border-white/10 bg-white/[0.06] ps-12 pe-12 text-sm text-white outline-none transition placeholder:text-white/25 hover:border-white/20 focus:border-[#D4692A]/70 focus:bg-white/[0.08] focus:ring-4 focus:ring-[#D4692A]/10"
+                      className="h-14 w-full rounded-2xl border border-white/10 bg-white/[0.06] ps-12 pe-12 text-sm text-white outline-none transition placeholder:text-white/25 hover:border-white/20 focus:border-[#E50914]/70 focus:bg-white/[0.08] focus:ring-4 focus:ring-[#E50914]/10"
                     />
 
                     <button
@@ -244,7 +244,7 @@ export default function AdminLogin() {
                   <button
                     type="submit"
                     disabled={loading || !password}
-                    className="group mt-5 flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-[#D4692A] text-sm font-semibold text-white shadow-lg shadow-red-950/30 transition duration-300 hover:bg-[#ff1722] hover:shadow-xl hover:shadow-red-950/40 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="group mt-5 flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-[#E50914] text-sm font-semibold text-white shadow-lg shadow-red-950/30 transition duration-300 hover:bg-[#ff1722] hover:shadow-xl hover:shadow-red-950/40 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {loading ? (
                       <>

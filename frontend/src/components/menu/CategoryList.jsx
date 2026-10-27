@@ -139,8 +139,8 @@ export default function CategoryList({
                 style={{ animationDelay: `${index * 70}ms` }}
                 className={`cat-rise group relative first:ms-auto last:me-auto h-[122px] w-[98px] short:h-[92px] short:w-[80px] tiny:h-[74px] tiny:w-[72px] shrink-0 overflow-hidden rounded-3xl border transition-all duration-500 active:scale-95 ${
                   isActive
-                    ? 'scale-105 border-maroon-bright bg-gradient-to-b from-maroon-bright via-maroon to-maroon-soft shadow-[0_0_28px_rgba(212,105,42,0.6)]'
-                    : 'border-line bg-panel hover:-translate-y-1 hover:border-maroon-bright/60 hover:shadow-[0_0_18px_rgba(212,105,42,0.3)]'
+                    ? 'scale-105 border-maroon-bright bg-gradient-to-b from-maroon-bright via-maroon to-maroon-soft shadow-[0_0_28px_rgba(179,24,28,0.6)]'
+                    : 'border-line bg-panel hover:-translate-y-1 hover:border-maroon-bright/60 hover:shadow-[0_0_18px_rgba(179,24,28,0.3)]'
                 }`}
               >
                 {/* Light sweep across the active card */}

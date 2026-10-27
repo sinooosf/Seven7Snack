@@ -93,7 +93,7 @@ export const STATUS_META = {
   almost: { label: 'Almost Ready', labelKey: 'admin.status.almost', pill: 'bg-[#0b57c9] text-white', dot: 'bg-blue-500' },
   ready: { label: 'Ready', labelKey: 'admin.status.ready', pill: 'bg-[#5b32e8] text-white', dot: 'bg-violet-500' },
   completed: { label: 'Completed', labelKey: 'admin.status.completed', pill: 'bg-[#2a2b31] text-[#d6d6db]', dot: 'bg-zinc-400' },
-  cancelled: { label: 'Cancelled', labelKey: 'admin.status.cancelled', pill: 'bg-[#6B3012] text-[#FFE0C2]', dot: 'bg-red-600' },
+  cancelled: { label: 'Cancelled', labelKey: 'admin.status.cancelled', pill: 'bg-[#7d1117] text-[#ffc9cc]', dot: 'bg-red-600' },
 }
 
 // What the staff can do next with an order.

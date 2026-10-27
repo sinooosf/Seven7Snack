@@ -281,7 +281,7 @@ export default function AdminMenu() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder={t('admin.menu.searchPlaceholder')}
-                    className="h-11 w-full rounded-xl border border-white/[0.09] bg-[#121215] ps-10 pe-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#E8873A]/60"
+                    className="h-11 w-full rounded-xl border border-white/[0.09] bg-[#121215] ps-10 pe-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#f0222c]/60"
                   />
                 </div>
                 <Dropdown
@@ -314,7 +314,7 @@ export default function AdminMenu() {
                     onClick={() => setActiveCategory(c.id)}
                     className={`shrink-0 whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium transition ${
                       activeCategory === c.id
-                        ? 'bg-[#E07A3A] text-white'
+                        ? 'bg-[#e11d28] text-white'
                         : 'bg-white/[0.06] text-white/75 hover:bg-white/[0.11]'
                     }`}
                   >
@@ -350,7 +350,7 @@ export default function AdminMenu() {
                   icon={<List size={22} />}
                   title={t('admin.menu.categories')}
                   action={
-                    <button type="button" onClick={() => setCategoryForm({})} className="text-xs font-medium text-[#E8873A] hover:text-[#F2A65C]">
+                    <button type="button" onClick={() => setCategoryForm({})} className="text-xs font-medium text-[#f0222c] hover:text-[#ff5a63]">
                       {t('admin.menu.addCategoryLink')}
                     </button>
                   }
@@ -416,7 +416,7 @@ export default function AdminMenu() {
                     <button
                       type="button"
                       onClick={restoreCategories}
-                      className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-[#E8873A] hover:text-[#F2A65C]"
+                      className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-[#f0222c] hover:text-[#ff5a63]"
                     >
                       <RotateCcw size={13} /> {t('admin.menu.restoreCategories')}
                     </button>
@@ -425,7 +425,7 @@ export default function AdminMenu() {
               </Card>
 
               <Card className="flex items-center gap-4 p-5">
-                <ChefHat size={38} className="shrink-0 text-[#E8873A]" strokeWidth={1.4} />
+                <ChefHat size={38} className="shrink-0 text-[#f0222c]" strokeWidth={1.4} />
                 <div>
                   <p className="text-[15px] font-semibold text-white">{t('admin.menu.keepFresh')}</p>
                   <p className="mt-1 text-xs text-white/50">{t('admin.menu.keepFreshText')}</p>
@@ -466,7 +466,7 @@ function ItemCard({ item, categoryLabel, badge, saving, onToggle, onEdit, onDele
       <div className="relative">
         <FadeImage src={item.image} alt={name} className="h-[120px] w-full rounded-xl bg-white/5" />
         {item.isBest && (
-          <span className="absolute start-2 top-2 rounded-md bg-[#D4692A] px-2 py-0.5 text-[11px] font-medium text-white">
+          <span className="absolute start-2 top-2 rounded-md bg-[#d9151f] px-2 py-0.5 text-[11px] font-medium text-white">
             {t('admin.menu.bestBadge')}
           </span>
         )}
@@ -614,7 +614,7 @@ function ItemModal({ initial, categories, onClose, onSave }) {
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            className="flex w-full items-center gap-4 rounded-xl border border-dashed border-white/20 bg-white/[0.03] p-3 text-start transition hover:border-[#E8873A]/60 hover:bg-white/[0.06]"
+            className="flex w-full items-center gap-4 rounded-xl border border-dashed border-white/20 bg-white/[0.03] p-3 text-start transition hover:border-[#f0222c]/60 hover:bg-white/[0.06]"
           >
             {shownPicture ? (
               <img src={shownPicture} alt="" className="h-16 w-16 shrink-0 rounded-lg bg-white object-cover" />
@@ -635,11 +635,11 @@ function ItemModal({ initial, categories, onClose, onSave }) {
           </Field>
           <div className="flex flex-col justify-end gap-2 pb-1 text-sm text-white/80">
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={form.isBest} onChange={(e) => set('isBest', e.target.checked)} className="accent-[#D4692A]" />
+              <input type="checkbox" checked={form.isBest} onChange={(e) => set('isBest', e.target.checked)} className="accent-[#d9151f]" />
               {t('admin.menu.fieldBest')}
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={form.available} onChange={(e) => set('available', e.target.checked)} className="accent-[#D4692A]" />
+              <input type="checkbox" checked={form.available} onChange={(e) => set('available', e.target.checked)} className="accent-[#d9151f]" />
               {t('admin.menu.available')}
             </label>
           </div>
@@ -743,7 +743,7 @@ function CategoryModal({ initial, onClose, onSave }) {
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            className="flex w-full items-center gap-4 rounded-xl border border-dashed border-white/20 bg-white/[0.03] p-3 text-start transition hover:border-[#E8873A]/60 hover:bg-white/[0.06]"
+            className="flex w-full items-center gap-4 rounded-xl border border-dashed border-white/20 bg-white/[0.03] p-3 text-start transition hover:border-[#f0222c]/60 hover:bg-white/[0.06]"
           >
             {shownPicture ? (
               <img src={shownPicture} alt="" className="h-16 w-16 shrink-0 rounded-full bg-white object-cover" />

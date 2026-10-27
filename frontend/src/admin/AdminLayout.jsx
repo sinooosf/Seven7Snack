@@ -88,11 +88,11 @@ function Shell() {
           <defs>
             <linearGradient id="ribbon-a" x1="0" y1="1" x2="1" y2="0">
               <stop offset="0" stopColor="#7a0c12" stopOpacity="0.95" />
-              <stop offset="1" stopColor="#D4692A" stopOpacity="0.15" />
+              <stop offset="1" stopColor="#d9151f" stopOpacity="0.15" />
             </linearGradient>
             <linearGradient id="ribbon-b" x1="0" y1="1" x2="1" y2="0">
-              <stop offset="0" stopColor="#D4692A" stopOpacity="0.55" />
-              <stop offset="1" stopColor="#D4692A" stopOpacity="0" />
+              <stop offset="0" stopColor="#d9151f" stopOpacity="0.55" />
+              <stop offset="1" stopColor="#d9151f" stopOpacity="0" />
             </linearGradient>
           </defs>
           <path d="M0 420 L0 250 C 70 300, 150 230, 232 120 L232 420 Z" fill="url(#ribbon-a)" />
@@ -116,7 +116,7 @@ function Shell() {
               className={({ isActive }) =>
                 `group flex items-center gap-3.5 rounded-xl px-5 py-3.5 text-[15px] font-medium transition ${
                   isActive
-                    ? 'bg-gradient-to-r rtl:bg-gradient-to-l from-[#D4692A] to-[#B4531E] text-white shadow-[0_8px_24px_rgba(212,105,42,0.35)]'
+                    ? 'bg-gradient-to-r rtl:bg-gradient-to-l from-[#d9151f] to-[#c4121c] text-white shadow-[0_8px_24px_rgba(217,21,31,0.35)]'
                     : 'text-white/75 hover:bg-white/[0.05] hover:text-white'
                 }`
               }
@@ -129,7 +129,7 @@ function Shell() {
                   {badge && summary.pendingCount > 0 && (
                     <span
                       className={`flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-xs font-bold ${
-                        isActive ? 'bg-white/90 text-[#B4531E]' : 'bg-[#E07A3A] text-white'
+                        isActive ? 'bg-white/90 text-[#c4121c]' : 'bg-[#e11d28] text-white'
                       }`}
                     >
                       {summary.pendingCount > 99 ? '99+' : summary.pendingCount}
@@ -231,11 +231,11 @@ function MobileTabBar() {
         >
           {({ isActive }) => (
             <>
-              {isActive && <span className="absolute inset-x-3 top-0 h-0.5 rounded-b bg-[#E8873A]" />}
+              {isActive && <span className="absolute inset-x-3 top-0 h-0.5 rounded-b bg-[#f0222c]" />}
               <span className="relative">
-                <Icon size={22} strokeWidth={isActive ? 2.2 : 1.8} className={isActive ? 'text-[#E8873A]' : ''} />
+                <Icon size={22} strokeWidth={isActive ? 2.2 : 1.8} className={isActive ? 'text-[#f0222c]' : ''} />
                 {badge && summary.pendingCount > 0 && (
-                  <span className="absolute -end-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#E07A3A] px-1 text-[9px] font-bold text-white">
+                  <span className="absolute -end-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#e11d28] px-1 text-[9px] font-bold text-white">
                     {summary.pendingCount > 99 ? '99+' : summary.pendingCount}
                   </span>
                 )}
@@ -294,8 +294,8 @@ function AlertsBanner() {
   if (dismissed) return null
 
   return (
-    <div className="mb-3 flex flex-col gap-2.5 rounded-2xl border border-[#E8873A]/40 bg-[#2a0709]/70 px-3 py-3 sm:flex-row sm:items-center sm:px-4">
-      <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#D4692A] text-white sm:flex">
+    <div className="mb-3 flex flex-col gap-2.5 rounded-2xl border border-[#f0222c]/40 bg-[#2a0709]/70 px-3 py-3 sm:flex-row sm:items-center sm:px-4">
+      <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#d9151f] text-white sm:flex">
         <BellRing size={20} />
       </span>
       <div className="min-w-0 flex-1">
@@ -307,7 +307,7 @@ function AlertsBanner() {
           type="button"
           disabled={push.status === 'working'}
           onClick={push.enable}
-          className="rounded-lg bg-[#D4692A] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#E8873A] disabled:opacity-60"
+          className="rounded-lg bg-[#d9151f] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#f0222c] disabled:opacity-60"
         >
           {push.status === 'working' ? t('admin.layout.alerts.working') : t('admin.layout.alerts.enable')}
         </button>
@@ -340,9 +340,9 @@ function WaiterAlerts() {
         return (
           <div
             key={call.id}
-            className="flex items-center gap-3 rounded-2xl border border-[#E8873A]/60 bg-[#2a0709]/95 px-3 py-2 sm:px-4 sm:py-3 shadow-[0_8px_30px_rgba(212,105,42,0.35)] backdrop-blur"
+            className="flex items-center gap-3 rounded-2xl border border-[#f0222c]/60 bg-[#2a0709]/95 px-3 py-2 sm:px-4 sm:py-3 shadow-[0_8px_30px_rgba(217,21,31,0.35)] backdrop-blur"
           >
-            <span className="flex h-9 w-9 shrink-0 animate-pulse sm:h-10 sm:w-10 items-center justify-center rounded-full bg-[#D4692A] text-white">
+            <span className="flex h-9 w-9 shrink-0 animate-pulse sm:h-10 sm:w-10 items-center justify-center rounded-full bg-[#d9151f] text-white">
               <BellRing size={20} />
             </span>
             <div className="min-w-0 flex-1">
@@ -356,7 +356,7 @@ function WaiterAlerts() {
             <button
               type="button"
               onClick={() => resolveWaiterCall(call.id)}
-              className="shrink-0 rounded-lg bg-white/90 px-4 py-2 text-xs font-semibold text-[#B4531E] transition hover:bg-white"
+              className="shrink-0 rounded-lg bg-white/90 px-4 py-2 text-xs font-semibold text-[#c4121c] transition hover:bg-white"
             >
               {t('admin.layout.waiter.answered')}
             </button>
