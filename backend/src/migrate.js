@@ -13,6 +13,26 @@ import { HOME_TABLE_ID, DELIVERY_TABLE_ID } from './links.js'
 
 export { HOME_TABLE_ID, DELIVERY_TABLE_ID }
 
+// Floors of the restaurant ("Ground floor", "Upper floor"...). Every table
+// belongs to one. Existing tables stay on the ground floor. Safe to run any
+// number of times; also called by the floors routes if they find it missing.
+export async function ensureFloors() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS floors (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      sort_order  INTEGER NOT NULL DEFAULT 0
+    );
+    -- A floors table made by an older/partial version gets what it lacks.
+    ALTER TABLE floors ADD COLUMN IF NOT EXISTS name       TEXT    NOT NULL DEFAULT 'Floor';
+    ALTER TABLE floors ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
+    INSERT INTO floors (id, name, sort_order) VALUES ('ground', 'Ground floor', 0)
+      ON CONFLICT (id) DO NOTHING;
+    ALTER TABLE restaurant_tables
+      ADD COLUMN IF NOT EXISTS floor_id TEXT NOT NULL DEFAULT 'ground' REFERENCES floors(id);
+  `)
+}
+
 export async function ensureSchema() {
   // Newer table columns
   await pool.query(`
@@ -48,22 +68,7 @@ export async function ensureSchema() {
     [DELIVERY_TABLE_ID],
   )
 
-  // Floors of the restaurant ("Ground floor", "Upper floor"...). Every table
-  // belongs to one. Existing tables stay on the ground floor.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS floors (
-      id          TEXT PRIMARY KEY,
-      name        TEXT NOT NULL,
-      sort_order  INTEGER NOT NULL DEFAULT 0
-    );
-    -- A floors table made by an older/partial version gets what it lacks.
-    ALTER TABLE floors ADD COLUMN IF NOT EXISTS name       TEXT    NOT NULL DEFAULT 'Floor';
-    ALTER TABLE floors ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
-    INSERT INTO floors (id, name, sort_order) VALUES ('ground', 'Ground floor', 0)
-      ON CONFLICT (id) DO NOTHING;
-    ALTER TABLE restaurant_tables
-      ADD COLUMN IF NOT EXISTS floor_id TEXT NOT NULL DEFAULT 'ground' REFERENCES floors(id);
-  `)
+  await ensureFloors()
 
   // Delivery orders carry the customer's phone number and address.
   await pool.query(`

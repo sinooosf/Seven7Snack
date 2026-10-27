@@ -57,7 +57,9 @@ async function request(path, { method = 'GET', body, password, rawBody, rawType 
   }
 
   if (!response.ok) {
-    const error = new Error(data.error || `Request to ${path} failed (${response.status})`)
+    const error = new Error(
+      (data.error || `Request to ${path} failed (${response.status})`) + (data.detail ? ` (${data.detail})` : ''),
+    )
     // Lets callers tell "the server said no" (404, 409...) apart from
     // "the server could not be reached" (no status at all).
     error.status = response.status

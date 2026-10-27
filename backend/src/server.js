@@ -70,7 +70,11 @@ app.use((err, req, res, next) => {
   }
 
   console.error(err)
-  res.status(500).json({ error: 'Something went wrong on the server.' })
+  // Dashboard routes are behind the staff password, so it is safe to say what
+  // went wrong there — it makes a broken database easy to diagnose.
+  const body = { error: 'Something went wrong on the server.' }
+  if (req.originalUrl.startsWith('/api/admin') && err?.message) body.detail = String(err.message).slice(0, 300)
+  res.status(500).json(body)
 })
 
 // A stray error in one request must never take the whole restaurant offline.

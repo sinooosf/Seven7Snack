@@ -367,3 +367,18 @@ describe('delivery link', () => {
     assert.ok((await admin('/floors')).body.length >= 1)
   })
 })
+
+describe('floors repair themselves', () => {
+  it('a missing floors table or column does not break the floors list or adding a floor', async () => {
+    const { default: pg } = await import('pg')
+    const pool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL })
+    await pool.query('ALTER TABLE restaurant_tables DROP COLUMN IF EXISTS floor_id')
+    await pool.query('DROP TABLE IF EXISTS floors CASCADE')
+    const list = await admin('/floors')
+    assert.equal(list.status, 200)
+    assert.ok(list.body.some((f) => f.id === 'ground'))
+    assert.equal((await admin('/floors', 'POST', { name: 'Terrace' })).status, 201)
+    assert.equal((await admin('/tables')).status, 200)
+    await pool.end()
+  })
+})

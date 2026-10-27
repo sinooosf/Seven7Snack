@@ -2,6 +2,7 @@ import express, { Router } from 'express'
 import { pool } from '../db.js'
 import { requireAdmin, checkAdminPassword, sendAuthError } from '../middleware/auth.js'
 import { DELIVERY_TABLE_ID, HOME_TABLE_ID } from '../links.js'
+import { ensureFloors } from '../migrate.js'
 import { markCategoryRemoved, markItemRemoved, removedCategoryIds, restoreRemovedCategories, unmarkCategoryRemoved } from '../menuSync.js'
 import { CATEGORIES as SEED_CATEGORIES } from '../menuData.js'
 import { TZ, dayStartSql, TABLE_ORDER_SQL } from '../time.js'
@@ -394,14 +395,28 @@ router.delete('/menu-items/:id', async (req, res, next) => {
 // Floors ("Ground floor", "Upper floor"...). Every table sits on one floor;
 // the Tables page shows one floor plan per floor.
 // ---------------------------------------------------------------------
+// If the floors table (or the floor_id column) is missing or incomplete, repair
+// it and try once more — a floors problem must never break the Tables page.
+async function withFloorsRepair(task) {
+  try {
+    return await task()
+  } catch (err) {
+    if (err.code !== '42P01' && err.code !== '42703' && err.code !== '23503') throw err
+    await ensureFloors()
+    return task()
+  }
+}
+
 router.get('/floors', async (req, res, next) => {
   try {
-    const result = await pool.query(
-      `SELECT f.*, COUNT(t.id)::int AS tables
-         FROM floors f
-         LEFT JOIN restaurant_tables t ON t.floor_id = f.id AND t.kind = 'table'
-        GROUP BY f.id
-        ORDER BY f.sort_order ASC, f.id ASC`,
+    const result = await withFloorsRepair(() =>
+      pool.query(
+        `SELECT f.*, COUNT(t.id)::int AS tables
+           FROM floors f
+           LEFT JOIN restaurant_tables t ON t.floor_id = f.id AND t.kind = 'table'
+          GROUP BY f.id
+          ORDER BY f.sort_order ASC, f.id ASC`,
+      ),
     )
     res.json(result.rows.map((row) => ({ ...serializeFloor(row), tables: row.tables })))
   } catch (err) {
@@ -417,18 +432,19 @@ router.post('/floors', async (req, res, next) => {
     const base =
       String(name).trim().toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) ||
       'floor'
-    let id = base
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const taken = await pool.query('SELECT 1 FROM floors WHERE id = $1', [id])
-      if (taken.rows.length === 0) break
-      id = `${base}-${Math.random().toString(16).slice(2, 6)}`
-    }
-
-    const result = await pool.query(
-      `INSERT INTO floors (id, name, sort_order)
-       VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM floors)) RETURNING *`,
-      [id, String(name).trim()],
-    )
+    const result = await withFloorsRepair(async () => {
+      let id = base
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const taken = await pool.query('SELECT 1 FROM floors WHERE id = $1', [id])
+        if (taken.rows.length === 0) break
+        id = `${base}-${Math.random().toString(16).slice(2, 6)}`
+      }
+      return pool.query(
+        `INSERT INTO floors (id, name, sort_order)
+         VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM floors)) RETURNING *`,
+        [id, String(name).trim()],
+      )
+    })
     res.status(201).json({ ...serializeFloor(result.rows[0]), tables: 0 })
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'That floor already exists.' })
