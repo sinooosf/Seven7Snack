@@ -57,7 +57,7 @@ export function CardTitle({ icon, title, subtitle, action }) {
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="flex items-center gap-3">
-        {icon && <span className="text-[#f0222c]">{icon}</span>}
+        {icon && <span className="text-[#E8873A]">{icon}</span>}
         <div>
           <h2 className="text-[17px] font-semibold leading-tight text-white">{title}</h2>
           {subtitle && <p className="mt-0.5 text-xs text-white/45">{subtitle}</p>}
@@ -69,7 +69,7 @@ export function CardTitle({ icon, title, subtitle, action }) {
 }
 
 const TONES = {
-  red: 'bg-gradient-to-br from-[#f0222c] to-[#b80f19] shadow-[0_6px_18px_rgba(217,21,31,0.35)]',
+  red: 'bg-gradient-to-br from-[#E8873A] to-[#b80f19] shadow-[0_6px_18px_rgba(212,105,42,0.35)]',
   green: 'bg-gradient-to-br from-[#12c27a] to-[#0a9460] shadow-[0_6px_18px_rgba(18,194,122,0.28)]',
   blue: 'bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] shadow-[0_6px_18px_rgba(59,130,246,0.28)]',
   purple: 'bg-gradient-to-br from-[#7c4dff] to-[#5527d9] shadow-[0_6px_18px_rgba(124,77,255,0.3)]',
@@ -101,7 +101,7 @@ function bigNumberSize(value) {
 export function StatCard({ icon, tone, label, value, delta, sub, children }) {
   return (
     <Card className="relative overflow-hidden p-3 sm:px-5 sm:py-5">
-      <div className="pointer-events-none absolute -start-8 -top-8 h-28 w-28 rounded-full bg-[#d9151f]/[0.07] blur-2xl" />
+      <div className="pointer-events-none absolute -start-8 -top-8 h-28 w-28 rounded-full bg-[#D4692A]/[0.07] blur-2xl" />
       <div className="relative flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <IconTile tone={tone} className="!h-9 !w-9 !rounded-xl sm:!h-14 sm:!w-14 sm:!rounded-2xl [&_svg]:!h-5 [&_svg]:!w-5 sm:[&_svg]:!h-7 sm:[&_svg]:!w-7">{icon}</IconTile>
 
@@ -152,7 +152,7 @@ export function TablePill({ tableId }) {
   return (
     <span
       className={`inline-flex items-center whitespace-nowrap rounded-lg px-3 py-1 text-xs font-medium text-white ${
-        isHome ? 'bg-[#8a4b0f]' : 'bg-[#5a0b10]'
+        isHome ? 'bg-[#8a4b0f]' : 'bg-[#4A230D]'
       }`}
     >
       {tableLabel(tableId)}
@@ -163,7 +163,7 @@ export function TablePill({ tableId }) {
 export function Spinner({ className = '' }) {
   return (
     <span
-      className={`inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/15 border-t-[#f0222c] ${className}`}
+      className={`inline-block h-5 w-5 animate-spin rounded-full border-2 border-white/15 border-t-[#E8873A] ${className}`}
     />
   )
 }
@@ -224,7 +224,7 @@ export function Dropdown({ value, options, onChange, icon, className = '', align
                 setOpen(false)
               }}
               className={`block w-full whitespace-nowrap px-4 py-2 text-start text-sm transition hover:bg-white/[0.06] ${
-                option.value === value ? 'text-[#ff4650]' : 'text-white/80'
+                option.value === value ? 'text-[#F2A65C]' : 'text-white/80'
               }`}
             >
               {option.label}
@@ -332,7 +332,7 @@ function Bell_() {
       >
         <Bell size={21} />
         {summary.pendingCount > 0 && (
-          <span className="absolute end-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-[#f0222c] ring-2 ring-[#09090b]" />
+          <span className="absolute end-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-[#E8873A] ring-2 ring-[#09090b]" />
         )}
       </button>
 
@@ -427,7 +427,7 @@ export function PrimaryButton({ className = '', children, ...props }) {
   return (
     <button
       type="button"
-      className={`inline-flex items-center justify-center gap-2 rounded-xl bg-[#d9151f] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_6px_20px_rgba(217,21,31,0.3)] transition hover:bg-[#f0222c] disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl bg-[#D4692A] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_6px_20px_rgba(212,105,42,0.3)] transition hover:bg-[#E8873A] disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
       {...props}
     >
       {children}
@@ -468,7 +468,7 @@ export function VibesCard({ className = '' }) {
         <p className="mt-2 max-w-[200px] text-sm leading-relaxed text-white/60">
           {t('admin.ui.vibesText')}
         </p>
-        <svg viewBox="0 0 120 12" className="mt-2 w-24 text-[#f0222c] rtl:-scale-x-100" fill="none">
+        <svg viewBox="0 0 120 12" className="mt-2 w-24 text-[#E8873A] rtl:-scale-x-100" fill="none">
           <path d="M2 8 C 30 2, 60 11, 118 3" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
         </svg>
 
@@ -497,7 +497,7 @@ export function GoodFoodCard({ className = '' }) {
           <br />
           Happy People
         </p>
-        <svg viewBox="0 0 120 12" className="mt-1 w-24 text-[#f0222c] rtl:-scale-x-100" fill="none">
+        <svg viewBox="0 0 120 12" className="mt-1 w-24 text-[#E8873A] rtl:-scale-x-100" fill="none">
           <path d="M2 8 C 30 2, 60 11, 118 3" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
         </svg>
       </div>

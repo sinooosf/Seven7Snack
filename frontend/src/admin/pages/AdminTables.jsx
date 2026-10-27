@@ -41,7 +41,7 @@ const POLL_MS = 5000
 
 const STATE = {
   available: { labelKey: 'admin.tables.state.available', border: '#12c27a', badge: 'bg-[#0f5a3a] text-[#7df0b8]', dot: 'bg-emerald-500' },
-  occupied: { labelKey: 'admin.tables.state.occupied', border: '#f0222c', badge: 'bg-[#8a0f17] text-[#ffc9cc]', dot: 'bg-[#f0222c]' },
+  occupied: { labelKey: 'admin.tables.state.occupied', border: '#E8873A', badge: 'bg-[#8a0f17] text-[#FFE0C2]', dot: 'bg-[#E8873A]' },
   cleaning: { labelKey: 'admin.tables.state.cleaning', border: '#ffa726', badge: 'bg-[#8a4b0f] text-[#ffd9a8]', dot: 'bg-amber-500' },
   out_of_service: { labelKey: 'admin.tables.state.out_of_service', border: '#6f6f78', badge: 'bg-[#2a2b31] text-[#d6d6db]', dot: 'bg-zinc-500' },
 }
@@ -611,7 +611,7 @@ function TableMenu({ table, busy, onSeats, onStatus, onRemove, onClose }) {
               disabled={busy}
               onClick={() => onStatus(value)}
               className={`rounded-lg px-3 py-1.5 text-start text-xs transition ${
-                table.override === value ? 'bg-[#d9151f] text-white' : 'text-white/80 hover:bg-white/[0.08]'
+                table.override === value ? 'bg-[#D4692A] text-white' : 'text-white/80 hover:bg-white/[0.08]'
               }`}
             >
               {label}
@@ -696,7 +696,7 @@ function LinksModal({ tables, onClose }) {
       <ul className="divide-y divide-white/[0.06]">
         {rows.map((row) => (
           <li key={row.key} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 sm:flex-nowrap">
-            <span className={`w-[110px] shrink-0 rounded-lg px-3 py-1 text-center text-xs font-semibold text-white ${row.special ? 'bg-[#8a4b0f]' : 'bg-[#5a0b10]'}`}>
+            <span className={`w-[110px] shrink-0 rounded-lg px-3 py-1 text-center text-xs font-semibold text-white ${row.special ? 'bg-[#8a4b0f]' : 'bg-[#4A230D]'}`}>
               {row.label}
             </span>
             <code className="order-last min-w-0 basis-full truncate text-xs text-white/55 sm:order-none sm:flex-1 sm:basis-auto">

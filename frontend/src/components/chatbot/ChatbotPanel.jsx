@@ -150,7 +150,7 @@ export default function ChatbotPanel({
       {/* BACKGROUND — one static gradient. (It used to be three huge blurred
           circles; blur filters that size on a layer that is also animating
           are what made phones lag and crash when the chat opened/closed.) */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_0%,rgba(180,20,35,0.32),transparent_42%),radial-gradient(circle_at_0%_55%,rgba(100,10,20,0.26),transparent_46%),radial-gradient(circle_at_90%_100%,rgba(130,15,25,0.2),transparent_44%),linear-gradient(145deg,#120304_0%,#080303_45%,#140305_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_0%,rgba(180,83,30,0.32),transparent_42%),radial-gradient(circle_at_0%_55%,rgba(100,10,20,0.26),transparent_46%),radial-gradient(circle_at_90%_100%,rgba(130,15,25,0.2),transparent_44%),linear-gradient(145deg,#120304_0%,#080303_45%,#140305_100%)]" />
 
       {/* HEADER */}
       <header className="relative z-10 flex items-center gap-3 border-b border-white/10 bg-black/20 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
@@ -243,7 +243,7 @@ export default function ChatbotPanel({
         <button
           type="submit"
           aria-label={t('chat.send')}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-700 text-cream shadow-[0_0_20px_rgba(180,20,35,0.3)] transition hover:bg-red-600 active:scale-95"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-700 text-cream shadow-[0_0_20px_rgba(180,83,30,0.3)] transition hover:bg-red-600 active:scale-95"
         >
           <Send size={17} className="rtl:-scale-x-100" />
         </button>
