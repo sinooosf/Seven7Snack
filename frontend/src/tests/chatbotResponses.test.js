@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { getBotResponse } from '../components/chatbot/chatbotResponses'
+import { MENU_ITEMS } from '../data/menu'
 
 describe('getBotResponse', () => {
   it('answers the name question', () => {
@@ -14,8 +15,15 @@ describe('getBotResponse', () => {
   })
 
   it('lists unavailable items when asked about availability', () => {
-    const response = getBotResponse("what's available today")
-    expect(response.text).toMatch(/Arugula & Prosciutto/)
+    // Everything on the built-in menu is available, so mark one dish unavailable for this test.
+    const dish = MENU_ITEMS.find((i) => i.id === 'pizza-ail-chinx')
+    dish.available = false
+    try {
+      const response = getBotResponse("what's available today")
+      expect(response.text).toMatch(/Pizza Ail Chinx/)
+    } finally {
+      dish.available = true
+    }
   })
 
   it('answers the opening hours question', () => {

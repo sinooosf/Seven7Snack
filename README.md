@@ -1,4 +1,4 @@
-# Meet The Chefs — Restaurant Ordering System
+# Seven Snack — Restaurant Ordering System
 
 A full QR-code table ordering system: each table gets its own link,
 customers order from their phone, and staff track it through a live
@@ -66,14 +66,23 @@ https://yourdomain.com/table/5
 Print a QR code for each. Add a 6th (or more) anytime from
 `/admin/tables` — it starts working immediately.
 
-## Two things you can still swap in yourself
+## The menu lives in the code
 
-**The intro video.** Drop your video at `frontend/public/intro.mp4`
-(exact name) and it plays automatically before the menu loads.
+The categories and dishes are defined in **`backend/src/menuData.js`**, and
+nowhere else needs to be touched (the dashboard cannot add or delete them).
+Every time the backend starts it makes the database match that file: new
+dishes appear, the ones that are no longer in the file disappear. So to change
+the menu: edit `menuData.js`, put the dish picture in
+`frontend/public/images/menu/<category>/<id>.webp`, mirror the change in
+`frontend/src/data/menu.js` (the offline fallback), push, and redeploy.
 
-**Logo and chatbot mascot,** if you haven't already — `Logo.jsx` and
-`ChatbotAvatar.jsx` under `frontend/src/components/brand/` have a one-line
-comment showing how to swap in real image files.
+Price, discount, "best" star and availability are the *starting* values from
+the file — staff can still change them from the dashboard's Menu tab and those
+changes are kept across restarts.
+
+The app opens straight to the language screen and then the menu (there is no
+intro video). The logo is `frontend/public/logo.png`, the chatbot picture is
+`frontend/public/bot.png`.
 
 ## How the frontend talks to the backend
 
@@ -110,7 +119,9 @@ restaurant-system/
 │   │   ├── server.js              Express app entry
 │   │   ├── db.js                  PostgreSQL connection
 │   │   ├── schema.sql             table definitions
-│   │   ├── seed.js                starting data (run once)
+│   │   ├── menuData.js            THE MENU (categories + dishes)
+│   │   ├── menuSync.js            makes the database match menuData.js at startup
+│   │   ├── seed.js                tables + FAQs on first run (also syncs the menu)
 │   │   ├── middleware/auth.js     admin password check
 │   │   └── routes/                menu, tables, orders, chatbot, admin
 │   └── README.md                  full backend setup

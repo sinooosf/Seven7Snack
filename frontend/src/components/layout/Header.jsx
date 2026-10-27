@@ -18,17 +18,17 @@ export default function Header({
   const { t } = useLanguage()
 
   return (
-    <header className="sticky top-0 z-[60] bg-ink/95 px-4 pb-3 pt-4 tiny:pb-1.5 tiny:pt-2 backdrop-blur">
-      <div className="relative flex items-center gap-1.5 rounded-full bg-mist-800/50 px-4 py-2.5 ps-20 backdrop-blur min-[400px]:gap-2.5">
+    <header className="sticky top-0 z-[60] bg-ink/95 px-4 pb-3 pt-3 tiny:pb-1.5 tiny:pt-1.5 backdrop-blur">
+      {/* Logo (wide, so it gets its own row above the search bar) */}
+      <div className="mb-2 flex justify-center tiny:mb-1">
+        <img
+          src={Logo}
+          alt={t('header.logo')}
+          className="h-9 w-auto object-contain tiny:h-6"
+        />
+      </div>
 
-        {/* Logo */}
-        <div className="absolute start-0 top-10 z-10 -translate-y-1/2">
-          <img
-            src={Logo}
-            alt={t('header.logo')}
-            className="h-20 w-auto object-contain"
-          />
-        </div>
+      <div className="relative flex items-center gap-1.5 rounded-full bg-mist-800/50 px-4 py-2.5 backdrop-blur min-[400px]:gap-2.5">
 
         {/* Search */}
         <div

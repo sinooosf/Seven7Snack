@@ -10,6 +10,7 @@ import chatbotRoutes from './routes/chatbot.js'
 import adminRoutes from './routes/admin.js'
 import uploadRoutes from './routes/uploads.js'
 import { ensureSchema } from './migrate.js'
+import { syncMenu } from './menuSync.js'
 
 const app = express()
 
@@ -83,8 +84,17 @@ if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 12) {
 }
 
 // Bring an older database up to date (new columns, the To Home link...)
-// before accepting any request.
+// before accepting any request, and load the menu from menuData.js.
 ensureSchema()
+  .then(async () => {
+    try {
+      const menu = await syncMenu()
+      console.log(`Menu loaded from code: ${menu.categories} categories, ${menu.items} dishes.`)
+    } catch (err) {
+      // Never keep the restaurant offline over this: serve what the database has.
+      console.error('Could not sync the menu from menuData.js:', err)
+    }
+  })
   .then(() => {
     const server = app.listen(port, () => {
       console.log(`Meet The Chefs API running on http://localhost:${port}`)

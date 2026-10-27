@@ -68,6 +68,13 @@ const EMPTY_ITEM = {
 const finalPrice = (item) =>
   Math.round(item.price * (1 - (Number(item.discountPercent) || 0) / 100))
 
+// The menu (which categories and dishes exist, their names and pictures) lives
+// in the code — backend/src/menuData.js — and is loaded by the server every
+// time it starts. So the dashboard can no longer add or delete categories and
+// dishes (they would be removed again at the next restart). Staff can still
+// change a dish's price, discount, "best" star and availability here.
+const MENU_IN_CODE = true
+
 export default function AdminMenu() {
   const { password } = useAdminAuth()
   const { t, lang, formatMoney, itemName, categoryName } = useLanguage()
@@ -102,6 +109,10 @@ export default function AdminMenu() {
   // The assistant's "Add a new menu item" shortcut opens /admin/menu?new=1
   useEffect(() => {
     if (params.get('new') && categories.length) {
+      if (MENU_IN_CODE) {
+        setParams({}, { replace: true })
+        return
+      }
       setEditing({ ...EMPTY_ITEM, categoryId: categories[0].id })
       setParams({}, { replace: true })
     }
@@ -258,12 +269,14 @@ export default function AdminMenu() {
                   className="w-full sm:w-[190px]"
                   align="left"
                 />
-                <PrimaryButton
-                  className="h-11 w-full sm:w-auto"
-                  onClick={() => setEditing({ ...EMPTY_ITEM, categoryId: categories[0]?.id || '' })}
-                >
-                  <Plus size={18} /> {t('admin.menu.addItem')}
-                </PrimaryButton>
+                {!MENU_IN_CODE && (
+                  <PrimaryButton
+                    className="h-11 w-full sm:w-auto"
+                    onClick={() => setEditing({ ...EMPTY_ITEM, categoryId: categories[0]?.id || '' })}
+                  >
+                    <Plus size={18} /> {t('admin.menu.addItem')}
+                  </PrimaryButton>
+                )}
               </div>
 
               <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
@@ -297,7 +310,7 @@ export default function AdminMenu() {
                     saving={savingId === item.id}
                     onToggle={() => patchItem(item, { available: !item.available })}
                     onEdit={() => setEditing(item)}
-                    onDelete={() => handleDelete(item)}
+                    onDelete={MENU_IN_CODE ? undefined : () => handleDelete(item)}
                   />
                 ))}
               </div>
@@ -310,9 +323,11 @@ export default function AdminMenu() {
                   icon={<List size={22} />}
                   title={t('admin.menu.categories')}
                   action={
-                    <button type="button" onClick={() => setAddingCategory(true)} className="text-xs font-medium text-[#f0222c] hover:text-[#ff5a63]">
-                      {t('admin.menu.addCategoryLink')}
-                    </button>
+                    MENU_IN_CODE ? null : (
+                      <button type="button" onClick={() => setAddingCategory(true)} className="text-xs font-medium text-[#f0222c] hover:text-[#ff5a63]">
+                        {t('admin.menu.addCategoryLink')}
+                      </button>
+                    )
                   }
                 />
 
@@ -330,9 +345,11 @@ export default function AdminMenu() {
                           <span className="block text-xs text-white/45">{t('admin.menu.itemCount', { count: countIn(c.id) })}</span>
                         </span>
                       </button>
-                      <button type="button" onClick={() => handleDeleteCategory(c)} aria-label={t('admin.menu.deleteAria', { name: categoryName(c) })} className="p-1 text-white/50 transition hover:text-red-400 md:text-white/30 md:opacity-0 md:focus:opacity-100 md:group-hover:opacity-100">
-                        <Trash2 size={15} />
-                      </button>
+                      {!MENU_IN_CODE && (
+                        <button type="button" onClick={() => handleDeleteCategory(c)} aria-label={t('admin.menu.deleteAria', { name: categoryName(c) })} className="p-1 text-white/50 transition hover:text-red-400 md:text-white/30 md:opacity-0 md:focus:opacity-100 md:group-hover:opacity-100">
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                       <ChevronRight size={16} className="text-white/50 rtl:-scale-x-100" />
                     </li>
                   ))}
@@ -417,9 +434,11 @@ function ItemCard({ item, categoryLabel, badge, saving, onToggle, onEdit, onDele
         <button type="button" onClick={onEdit} aria-label={t('admin.menu.editAria', { name })} className="text-white/55 transition hover:text-white">
           <Pencil size={16} />
         </button>
-        <button type="button" onClick={onDelete} aria-label={t('admin.menu.deleteAria', { name })} className="text-white/55 transition hover:text-red-400">
-          <Trash2 size={16} />
-        </button>
+        {onDelete && (
+          <button type="button" onClick={onDelete} aria-label={t('admin.menu.deleteAria', { name })} className="text-white/55 transition hover:text-red-400">
+            <Trash2 size={16} />
+          </button>
+        )}
       </div>
     </div>
   )
