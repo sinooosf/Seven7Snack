@@ -56,6 +56,9 @@ export async function ensureSchema() {
       name        TEXT NOT NULL,
       sort_order  INTEGER NOT NULL DEFAULT 0
     );
+    -- A floors table made by an older/partial version gets what it lacks.
+    ALTER TABLE floors ADD COLUMN IF NOT EXISTS name       TEXT    NOT NULL DEFAULT 'Floor';
+    ALTER TABLE floors ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
     INSERT INTO floors (id, name, sort_order) VALUES ('ground', 'Ground floor', 0)
       ON CONFLICT (id) DO NOTHING;
     ALTER TABLE restaurant_tables

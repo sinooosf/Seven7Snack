@@ -87,7 +87,12 @@ export default function AdminTables() {
 
   const load = useCallback(async () => {
     try {
-      const [rows, floorRows] = await Promise.all([adminFetchTables(password), adminFetchFloors(password)])
+      // Floors are an extra: if they cannot be loaded the page still works
+      // (every table is then shown on one floor).
+      const [rows, floorRows] = await Promise.all([
+        adminFetchTables(password),
+        adminFetchFloors(password).catch(() => []),
+      ])
       setTables(rows)
       setFloors(floorRows)
       setError('')
