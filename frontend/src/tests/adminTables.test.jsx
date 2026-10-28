@@ -70,6 +70,15 @@ describe('dashboard Tables page', () => {
     expect((await screen.findAllByText('Table 2')).length).toBeGreaterThan(0)
   })
 
+  it('never hides a table whose floor does not match any floor', async () => {
+    adminFetchFloors.mockResolvedValue([{ id: 'ground', name: 'Ground floor', tables: 5 }])
+    adminFetchTables.mockResolvedValue(TABLES.map((tb) => ({ ...tb, floorId: 'some-old-id' })))
+    renderPage()
+    expect((await screen.findAllByText('Table 1')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Table 3').length).toBeGreaterThan(0)
+    expect(screen.getByText(/Ground floor/).textContent).toContain('(3)')
+  })
+
   it('adds a floor and switches to its tab; tables of other floors are not shown there', async () => {
     adminCreateFloor.mockImplementation(async () => {
       adminFetchFloors.mockResolvedValue([

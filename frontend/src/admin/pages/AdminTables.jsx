@@ -115,9 +115,18 @@ export default function AdminTables() {
   // Every real table (all floors), the one floor being shown, and the special links.
   const allTables = useMemo(() => (tables || []).filter((tb) => (tb.kind || 'table') === 'table'), [tables])
   const activeFloor = floors.find((f) => f.id === activeFloorId) || floors[0] || null
+  // The floor a table sits on. A table whose floor is unknown (missing, or not
+  // in the list of floors) is shown on the first floor — never hidden.
+  const floorIdOf = useCallback(
+    (tb) => {
+      const known = floors.find((f) => String(f.id) === String(tb.floorId))
+      return known ? known.id : floors[0]?.id ?? null
+    },
+    [floors],
+  )
   const floor = useMemo(
-    () => allTables.filter((tb) => (tb.floorId || 'ground') === (activeFloor?.id || 'ground')),
-    [allTables, activeFloor],
+    () => allTables.filter((tb) => !activeFloor || floorIdOf(tb) === activeFloor.id),
+    [allTables, activeFloor, floorIdOf],
   )
   const homeLink = (tables || []).find((tb) => tb.kind === 'home')
   const deliveryLink = (tables || []).find((tb) => tb.kind === 'delivery')
@@ -224,7 +233,7 @@ export default function AdminTables() {
                       f.id === activeFloor?.id ? 'bg-[#e11d28] text-white' : 'bg-white/[0.06] text-white/75 hover:bg-white/[0.11]'
                     }`}
                   >
-                    {f.name} <span className="text-xs opacity-70">({f.tables})</span>
+                    {f.name} <span className="text-xs opacity-70">({allTables.filter((tb) => floorIdOf(tb) === f.id).length})</span>
                   </button>
                 ))}
                 <button
@@ -377,7 +386,11 @@ export default function AdminTables() {
               else newId = (await adminCreateFloor(password, name)).id
             })
             if (ok) {
-              if (newId) setActiveFloorId(newId)
+              if (newId) {
+                // Show the new floor right away, even if the reloaded list was stale.
+                setFloors((prev) => (prev.some((f) => f.id === newId) ? prev : [...prev, { id: newId, name, tables: 0 }]))
+                setActiveFloorId(newId)
+              }
               setDialog(null)
             }
           }}
