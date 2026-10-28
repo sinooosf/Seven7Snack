@@ -24,7 +24,7 @@ export default function Header({
         <img
           src={Logo}
           alt={t('header.logo')}
-          className="h-9 w-auto object-contain tiny:h-6"
+          className="h-14 w-auto object-contain tiny:h-9"
         />
       </div>
 
