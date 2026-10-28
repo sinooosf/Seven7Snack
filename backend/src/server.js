@@ -25,11 +25,7 @@ const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173')
 // Smaller answers = faster loading on slow connections (JSON shrinks ~5x;
 // pictures are already compressed and are left alone).
 app.use(compression())
-// The dashboard sends a custom header (x-admin-password), so the browser asks
-// permission (an extra "preflight" request) before EVERY call. Without maxAge
-// it forgets the answer after 5 seconds, which doubled the round trips on the
-// dashboard's polling. Letting it remember makes every click and refresh faster.
-app.use(cors({ origin: allowedOrigins, maxAge: 7200 }))
+app.use(cors({ origin: allowedOrigins }))
 app.use(express.json({ limit: '100kb' }))
 
 app.get('/api/health', (req, res) => res.json({ ok: true }))

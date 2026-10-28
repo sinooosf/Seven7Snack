@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { pollWhileVisible } from '../../utils/poll'
 import { Link } from 'react-router-dom'
 import {
   Armchair,
@@ -14,8 +15,6 @@ import {
 } from 'lucide-react'
 import { useAdminAuth } from '../AdminAuthContext'
 import { adminFetchOverview } from '../../services/api'
-import { overviewPath, peek } from '../../services/adminCache'
-import { startPolling } from '../usePolling'
 import { useLanguage } from '../../i18n/LanguageContext'
 import SalesChart from '../components/SalesChart'
 import {
@@ -38,14 +37,13 @@ export default function AdminOverview() {
   const { password } = useAdminAuth()
   const [range, setRange] = useState('today')
   const [metric, setMetric] = useState('orders')
-  // Opens with the last answer on screen (if any); the fresh one replaces it.
-  const [data, setData] = useState(() => peek(overviewPath('today')))
+  const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const { t } = useLanguage()
 
   useEffect(() => {
     let cancelled = false
-    setData(peek(overviewPath(range)))
+    setData(null)
 
     async function load() {
       try {
@@ -59,10 +57,11 @@ export default function AdminOverview() {
       }
     }
 
-    const stop = startPolling(load, POLL_MS)
+    load()
+    const stopPolling = pollWhileVisible(load, POLL_MS)
     return () => {
       cancelled = true
-      stop()
+      stopPolling()
     }
   }, [password, range])
 

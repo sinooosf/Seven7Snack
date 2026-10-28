@@ -26,7 +26,7 @@ describe('translations', () => {
 
 describe('chatbot in three languages', () => {
   it.each(['en', 'fr', 'ar'])('answers each quick question in %s with the right rule', (lang) => {
-    const [name, best, available, hours] = quickQuestions(lang)
+    const [name, best, available, hours, contact, delivery] = quickQuestions(lang)
     expect(getBotResponse(name, lang).text).toBe(translate(lang, 'chat.r.name'))
     expect(getBotResponse(best, lang).richContent.type).toBe('items')
     expect(getBotResponse(available, lang).text).toBe(
@@ -34,6 +34,9 @@ describe('chatbot in three languages', () => {
     )
     expect(getBotResponse(available, lang).text).not.toBe(translate(lang, 'chat.r.fallback'))
     expect(getBotResponse(hours, lang).text).toBe(translate(lang, 'chat.r.hours'))
+    expect(getBotResponse(contact, lang).text).toBe(translate(lang, 'chat.r.contact'))
+    expect(getBotResponse(contact, lang).richContent.type).toBe('contact')
+    expect(getBotResponse(delivery, lang).text).toBe(translate(lang, 'chat.r.delivery'))
   })
 
   it('understands a French question while Arabic is selected and answers in Arabic', () => {

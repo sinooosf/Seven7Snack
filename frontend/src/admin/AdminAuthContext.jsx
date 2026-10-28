@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { adminLogin } from '../services/api'
-import { clearAdminCache } from '../services/adminCache'
 
 const AdminAuthContext = createContext(null)
 const STORAGE_KEY = 'mtc-admin-password'
@@ -15,13 +14,11 @@ export function AdminAuthProvider({ children }) {
 
   const login = useCallback(async (candidate) => {
     await adminLogin(candidate) // throws if wrong — let the caller catch it
-    clearAdminCache()
     localStorage.setItem(STORAGE_KEY, candidate)
     setPassword(candidate)
   }, [])
 
   const logout = useCallback(() => {
-    clearAdminCache()
     localStorage.removeItem(STORAGE_KEY)
     setPassword('')
   }, [])

@@ -1,6 +1,7 @@
 import { Component, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, RotateCcw, Send, User } from 'lucide-react'
+import { ArrowLeft, Phone, RotateCcw, Send, User } from 'lucide-react'
+import { CONTACT } from '../../data/contact'
 // Files in /public are referenced by URL, never imported.
 const ChatbotAvatar = '/bot.png'
 import { useCart } from '../../context/CartContext'
@@ -254,45 +255,22 @@ export default function ChatbotPanel({
   )
 }
 
-// Small line icons (drawn here so no extra icon package is needed).
-function ContactIcon({ kind }) {
-  const common = {
-    width: 18,
-    height: 18,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 2,
-    strokeLinecap: 'round',
-    strokeLinejoin: 'round',
-    'aria-hidden': true,
-    className: 'shrink-0',
-  }
-
-  if (kind === 'call') {
-    return (
-      <svg {...common}>
-        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-      </svg>
-    )
-  }
-
-  if (kind === 'instagram') {
-    return (
-      <svg {...common}>
-        <rect x="3" y="3" width="18" height="18" rx="5" />
-        <circle cx="12" cy="12" r="4" />
-        <circle cx="17.5" cy="6.5" r="0.6" fill="currentColor" />
-      </svg>
-    )
-  }
-
-  // tiktok: a music note
+// Small brand icons drawn here (the icon library has no brand logos).
+function InstagramIcon({ size = 14 }) {
   return (
-    <svg {...common}>
-      <path d="M9 18V5l12-2v13" />
-      <circle cx="6" cy="18" r="3" />
-      <circle cx="18" cy="16" r="3" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="0.6" fill="currentColor" />
+    </svg>
+  )
+}
+
+function TikTokIcon({ size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5" />
+      <path d="M14 3c.4 2.6 2 4.2 5 4.5" />
     </svg>
   )
 }
@@ -349,26 +327,43 @@ function ChatBubble({ message, onAdd, onView }) {
           <>
             <p>{message.text}</p>
 
-            {/* QUICK ACTIONS — tap to call, or open Instagram / TikTok */}
+            {/* RICH CONTENT */}
             {message.richContent?.type === 'contact' && (
               <div className="mt-2.5 flex flex-col gap-2">
-                {message.richContent.actions.map((action) => (
+                {CONTACT.phones.map((phone) => (
                   <a
-                    key={action.href}
-                    href={action.href}
-                    {...(action.kind === 'call' ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
-                    className="flex items-center gap-2.5 rounded-xl border border-red-300/25 bg-red-950/50 px-3 py-2.5 text-xs font-semibold text-cream transition hover:border-red-400/50 hover:bg-red-800/40 active:scale-[0.98]"
+                    key={phone}
+                    href={`tel:${phone}`}
+                    className="flex items-center gap-2 rounded-xl bg-red-700 px-3 py-2 text-xs font-semibold text-cream transition hover:bg-red-600"
                   >
-                    <ContactIcon kind={action.kind} />
-                    <span dir="auto" className="min-w-0 flex-1 truncate">
-                      {action.label}
-                    </span>
+                    <Phone size={14} />
+                    <span>{t('chat.contact.call')}</span>
+                    <span dir="ltr" className="ms-auto tracking-wide">{phone}</span>
                   </a>
                 ))}
+                <a
+                  href={CONTACT.tiktok.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] px-3 py-2 text-xs font-semibold text-cream transition hover:bg-white/[0.12]"
+                >
+                  <TikTokIcon />
+                  <span>{t('chat.contact.tiktok')}</span>
+                  <span dir="ltr" className="ms-auto text-cream/70">@{CONTACT.tiktok.handle}</span>
+                </a>
+                <a
+                  href={CONTACT.instagram.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] px-3 py-2 text-xs font-semibold text-cream transition hover:bg-white/[0.12]"
+                >
+                  <InstagramIcon />
+                  <span>{t('chat.contact.instagram')}</span>
+                  <span dir="ltr" className="ms-auto truncate text-cream/70">@{CONTACT.instagram.handle}</span>
+                </a>
               </div>
             )}
 
-            {/* RICH CONTENT */}
             {message.richContent?.type === 'items' && (
               <div className="mt-2.5 space-y-2">
                 {message.richContent.items.map((item) => (

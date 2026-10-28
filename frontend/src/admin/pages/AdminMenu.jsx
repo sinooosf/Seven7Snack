@@ -31,7 +31,6 @@ import {
   adminUploadImage,
   adminUpdateMenuItem,
 } from '../../services/api'
-import { categoriesPath, menuItemsPath, peek } from '../../services/adminCache'
 import {
   Card,
   CardTitle,
@@ -79,9 +78,8 @@ export default function AdminMenu() {
   const { t, lang, formatMoney, itemName, categoryName } = useLanguage()
   const [params, setParams] = useSearchParams()
 
-  // Opens with the last answer on screen (if any); the fresh one replaces it.
-  const [items, setItems] = useState(() => peek(menuItemsPath()))
-  const [categories, setCategories] = useState(() => peek(categoriesPath()) || [])
+  const [items, setItems] = useState(null)
+  const [categories, setCategories] = useState([])
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('all')

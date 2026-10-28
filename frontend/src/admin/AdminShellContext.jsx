@@ -2,7 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { adminFetchSummary, adminResolveWaiterCall } from '../services/api'
 import { useAdminAuth } from './AdminAuthContext'
 import { usePushAlerts } from './usePushAlerts'
-import { startPolling } from './usePolling'
 
 const ShellContext = createContext(null)
 
@@ -86,14 +85,12 @@ export function AdminShellProvider({ children }) {
 
   useEffect(() => {
     mounted.current = true
-    // Keeps running in a background tab on purpose: it is what rings the
-    // "new order" / "call waiter" sounds. It only skips a turn while the
-    // previous check is still waiting for the server.
-    const stop = startPolling(() => refreshSummary(), SUMMARY_POLL_MS, { pauseWhenHidden: false })
+    refreshSummary()
+    const timer = setInterval(refreshSummary, SUMMARY_POLL_MS)
 
     return () => {
       mounted.current = false
-      stop()
+      clearInterval(timer)
     }
   }, [refreshSummary])
 

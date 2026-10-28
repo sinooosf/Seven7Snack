@@ -73,10 +73,16 @@ export async function placeOrder(body) {
       }
     }
 
+    // One query for every dish of the order (not one per dish): fewer trips to
+    // the database means each order holds its connection for less time, which
+    // is what keeps the restaurant fast when many phones order at once.
+    const wantedIds = [...new Set(parsed.lines.map((line) => line.id))]
+    const found = await client.query('SELECT * FROM menu_items WHERE id = ANY($1::text[])', [wantedIds])
+    const byId = new Map(found.rows.map((row) => [row.id, row]))
+
     const resolvedLines = []
     for (const { id, quantity } of parsed.lines) {
-      const itemResult = await client.query('SELECT * FROM menu_items WHERE id = $1', [id])
-      const item = itemResult.rows[0]
+      const item = byId.get(id)
       if (!item) {
         await client.query('ROLLBACK').catch(() => {})
         return { status: 400, error: `Unknown menu item: ${String(id).slice(0, 60)}` }
@@ -95,21 +101,32 @@ export async function placeOrder(body) {
 
     const total = resolvedLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
 
-    const orderResult = await client.query(
-      'INSERT INTO orders (table_id, status, total, note, phone, address) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [tableId, 'preparing', total, note.value, phone, address],
+    // The order and all of its lines in a single statement.
+    const inserted = await client.query(
+      `WITH new_order AS (
+         INSERT INTO orders (table_id, status, total, note, phone, address)
+         VALUES ($1, 'preparing', $2, $3, $4, $5)
+         RETURNING id
+       )
+       INSERT INTO order_items (order_id, item_id, name, quantity, unit_price)
+       SELECT new_order.id, l.item_id, l.name, l.quantity, l.unit_price
+         FROM new_order,
+              unnest($6::text[], $7::text[], $8::int[], $9::int[]) AS l(item_id, name, quantity, unit_price)
+       RETURNING order_id`,
+      [
+        tableId, total, note.value, phone, address,
+        resolvedLines.map((l) => l.id),
+        resolvedLines.map((l) => l.name),
+        resolvedLines.map((l) => l.quantity),
+        resolvedLines.map((l) => l.unitPrice),
+      ],
     )
-    let order = orderResult.rows[0]
-
-    for (const line of resolvedLines) {
-      await client.query(
-        'INSERT INTO order_items (order_id, item_id, name, quantity, unit_price) VALUES ($1,$2,$3,$4,$5)',
-        [order.id, line.id, line.name, line.quantity, line.unitPrice],
-      )
-    }
+    const orderId = inserted.rows[0].order_id
 
     // Give the order today's next number: 1 + the highest number used today
     // (today = the restaurant's own day, so it starts again at 1 after midnight).
+    // The lock is its own statement so the numbering query that follows sees
+    // every order committed while we were waiting for it.
     await client.query('SELECT pg_advisory_xact_lock($1)', [ORDER_NUMBER_LOCK])
     const numbered = await client.query(
       `UPDATE orders
@@ -118,9 +135,9 @@ export async function placeOrder(body) {
          FROM (SELECT (now() AT TIME ZONE $2)::date AS d) today
         WHERE orders.id = $1
         RETURNING orders.*`,
-      [order.id, TZ],
+      [orderId, TZ],
     )
-    order = numbered.rows[0]
+    const order = numbered.rows[0]
 
     await client.query('COMMIT')
     return {

@@ -17,7 +17,9 @@ const isLocal = process.env.DATABASE_URL.includes('localhost') || process.env.DA
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: isLocal ? false : { rejectUnauthorized: false },
-  max: 10,
+  // More connections = more orders handled at the same moment (Render's database
+  // allows far more than this). Set DB_POOL_MAX to change it.
+  max: Number(process.env.DB_POOL_MAX) || 20,
   // Do not wait forever for a free connection or a slow query: after these
   // limits the request fails cleanly instead of hanging the restaurant.
   connectionTimeoutMillis: 10_000,

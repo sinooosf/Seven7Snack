@@ -758,17 +758,15 @@ router.get('/orders', async (req, res, next) => {
       : req.query.scope === 'all' ? 'all' : 'today'
     const cond = rangeCondition(range)
 
-    // Independent questions: ask the database both at the same time.
-    const [ordersResult, countsResult] = await Promise.all([
-      pool.query(
-        `SELECT * FROM orders WHERE ${cond.sql} ORDER BY created_at DESC LIMIT 1000`,
-        cond.params,
-      ),
-      pool.query(
-        `SELECT status, COUNT(*)::int AS n FROM orders WHERE ${cond.sql} GROUP BY status`,
-        cond.params,
-      ),
-    ])
+    const ordersResult = await pool.query(
+      `SELECT * FROM orders WHERE ${cond.sql} ORDER BY created_at DESC LIMIT 1000`,
+      cond.params,
+    )
+
+    const countsResult = await pool.query(
+      `SELECT status, COUNT(*)::int AS n FROM orders WHERE ${cond.sql} GROUP BY status`,
+      cond.params,
+    )
     const counts = { preparing: 0, almost: 0, ready: 0, completed: 0, cancelled: 0 }
     for (const row of countsResult.rows) counts[row.status] = row.n
 
@@ -1120,39 +1118,40 @@ router.get('/overview', async (req, res, next) => {
       return hours
     }
 
-    // Every question below is independent: ask them all at the same time
-    // instead of one after the other (this page used to wait for 7 round trips).
-    const [current, previous, hoursNow, hoursPrev, top, tableCounts, recent] = await Promise.all([
+    const [current, previous, hoursNow, hoursPrev] = await Promise.all([
       totals(start, end),
       totals(prevStart, start),
       hourly(start, end),
       hourly(prevStart, start),
-      pool.query(
-        `SELECT oi.item_id AS id,
-                MAX(oi.name) AS name,
-                SUM(oi.quantity)::int AS quantity,
-                COUNT(DISTINCT o.id)::int AS orders
-           FROM order_items oi
-           JOIN orders o ON o.id = oi.order_id
-          WHERE o.created_at >= $1 AND o.created_at < $2 AND o.status <> 'cancelled'
-          GROUP BY oi.item_id
-          ORDER BY orders DESC, quantity DESC
-          LIMIT 5`,
-        [start, end],
-      ),
-      pool.query(
-        `SELECT
-           (SELECT COUNT(*)::int FROM restaurant_tables WHERE kind = 'table') AS total_tables,
-           (SELECT COUNT(DISTINCT o.table_id)::int
-              FROM orders o JOIN restaurant_tables t ON t.id = o.table_id AND t.kind = 'table'
-             WHERE o.status = ANY($1) AND o.created_at > now() - interval '6 hours') AS occupied_tables`,
-        [OPEN_STATUSES],
-      ),
-      pool.query(
-        `SELECT * FROM orders WHERE created_at >= $1 AND created_at < $2 ORDER BY created_at DESC LIMIT 5`,
-        [start, end],
-      ),
     ])
+
+    const top = await pool.query(
+      `SELECT oi.item_id AS id,
+              MAX(oi.name) AS name,
+              SUM(oi.quantity)::int AS quantity,
+              COUNT(DISTINCT o.id)::int AS orders
+         FROM order_items oi
+         JOIN orders o ON o.id = oi.order_id
+        WHERE o.created_at >= $1 AND o.created_at < $2 AND o.status <> 'cancelled'
+        GROUP BY oi.item_id
+        ORDER BY orders DESC, quantity DESC
+        LIMIT 5`,
+      [start, end],
+    )
+
+    const tableCounts = await pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM restaurant_tables WHERE kind = 'table') AS total_tables,
+         (SELECT COUNT(DISTINCT o.table_id)::int
+            FROM orders o JOIN restaurant_tables t ON t.id = o.table_id AND t.kind = 'table'
+           WHERE o.status = ANY($1) AND o.created_at > now() - interval '6 hours') AS occupied_tables`,
+      [OPEN_STATUSES],
+    )
+
+    const recent = await pool.query(
+      `SELECT * FROM orders WHERE created_at >= $1 AND created_at < $2 ORDER BY created_at DESC LIMIT 5`,
+      [start, end],
+    )
 
     res.json({
       range,

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { pollWhileVisible } from '../../utils/poll'
 import { Link } from 'react-router-dom'
 import { Check, ChevronUp, Minus, Plus, Search, SquarePlus, Trash2, X } from 'lucide-react'
 import { useIsDesktop } from '../useIsDesktop'
@@ -58,8 +59,7 @@ export default function AdminNewOrder() {
 
   useEffect(() => {
     load()
-    const timer = setInterval(load, REFRESH_MS)
-    return () => clearInterval(timer)
+    return pollWhileVisible(load, REFRESH_MS)
   }, [load])
 
   const byId = useMemo(() => new Map((items || []).map((item) => [item.id, item])), [items])

@@ -5,8 +5,6 @@
 // (see frontend/.env.example). Defaults to localhost for local dev.
 // ---------------------------------------------------------------------------
 
-import { remember, clearAdminCache, menuItemsPath, categoriesPath } from './adminCache'
-
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
 
 
@@ -55,7 +53,6 @@ async function request(path, { method = 'GET', body, password, rawBody, rawType 
   // The server no longer accepts the saved staff password (it was changed):
   // tell the dashboard so it can send the person back to the login screen.
   if (response.status === 401 && password && typeof window !== 'undefined') {
-    clearAdminCache()
     window.dispatchEvent(new Event('mtc-admin-unauthorized'))
   }
 
@@ -68,9 +65,6 @@ async function request(path, { method = 'GET', body, password, rawBody, rawType 
     error.status = response.status
     throw error
   }
-
-  // Dashboard pages open instantly with the last answer (see adminCache.js).
-  if (method === 'GET' && password) remember(path, data)
 
   return data
 }
@@ -153,16 +147,12 @@ export function adminLogin(password) {
 
 export async function adminFetchCategories(password) {
   const rows = await request('/admin/categories', { password })
-  const result = Array.isArray(rows) ? rows.map(withImage) : rows
-  remember(categoriesPath(), result) // the version with full picture addresses
-  return result
+  return Array.isArray(rows) ? rows.map(withImage) : rows
 }
 
 export async function adminFetchMenuItems(password) {
   const rows = await request('/admin/menu-items', { password })
-  const result = Array.isArray(rows) ? rows.map(withImage) : rows
-  remember(menuItemsPath(), result)
-  return result
+  return Array.isArray(rows) ? rows.map(withImage) : rows
 }
 
 export async function adminCreateMenuItem(password, item) {

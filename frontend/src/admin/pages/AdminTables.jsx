@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { pollWhileVisible } from '../../utils/poll'
 import {
   Armchair,
   ChevronRight,
@@ -16,8 +17,6 @@ import {
 } from 'lucide-react'
 import { useLanguage } from '../../i18n/LanguageContext'
 import { useAdminAuth } from '../AdminAuthContext'
-import { floorsPath, peek, tablesPath } from '../../services/adminCache'
-import { startPolling } from '../usePolling'
 import {
   adminCreateFloor,
   adminCreateTable,
@@ -77,9 +76,8 @@ export default function AdminTables() {
   const { password } = useAdminAuth()
   const { t, lang, tableLabel } = useLanguage()
 
-  // Opens with the last answer on screen (if any); the fresh one replaces it.
-  const [tables, setTables] = useState(() => peek(tablesPath()))
-  const [floors, setFloors] = useState(() => peek(floorsPath()) || [])
+  const [tables, setTables] = useState(null)
+  const [floors, setFloors] = useState([])
   const [activeFloorId, setActiveFloorId] = useState(null)
   const [error, setError] = useState('')
   const [floorsError, setFloorsError] = useState('')
@@ -109,7 +107,10 @@ export default function AdminTables() {
     }
   }, [password])
 
-  useEffect(() => startPolling(load, POLL_MS), [load])
+  useEffect(() => {
+    load()
+    return pollWhileVisible(load, POLL_MS)
+  }, [load])
 
   // Every real table (all floors), the one floor being shown, and the special links.
   const allTables = useMemo(() => (tables || []).filter((tb) => (tb.kind || 'table') === 'table'), [tables])
