@@ -79,6 +79,7 @@ export default function AdminTables() {
   const [floors, setFloors] = useState([])
   const [activeFloorId, setActiveFloorId] = useState(null)
   const [error, setError] = useState('')
+  const [floorsError, setFloorsError] = useState('')
   const [highlightId, setHighlightId] = useState(null)
   const [dialog, setDialog] = useState(null) // 'add' | 'links' | 'addFloor' | 'renameFloor'
   const [menu, setMenu] = useState(null) // { id, x, y }
@@ -91,10 +92,14 @@ export default function AdminTables() {
       // (every table is then shown on one floor).
       const [rows, floorRows] = await Promise.all([
         adminFetchTables(password),
-        adminFetchFloors(password).catch(() => []),
+        adminFetchFloors(password).catch((err) => {
+          setFloorsError(err.message)
+          return []
+        }),
       ])
       setTables(rows)
       setFloors(floorRows)
+      if (floorRows.length > 0) setFloorsError('')
       setError('')
     } catch (err) {
       setError(err.message)
@@ -175,6 +180,7 @@ export default function AdminTables() {
       />
 
       <ErrorBanner message={error} onClose={() => setError('')} />
+      {floorsError && <ErrorBanner message={`Floors: ${floorsError}`} onClose={() => setFloorsError('')} />}
 
       {!tables ? (
         <div className="flex justify-center py-32">

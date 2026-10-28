@@ -409,18 +409,26 @@ async function withFloorsRepair(task) {
 
 router.get('/floors', async (req, res, next) => {
   try {
+    // Plain sub-select (no GROUP BY) so an odd floors table cannot break it.
     const result = await withFloorsRepair(() =>
       pool.query(
-        `SELECT f.*, COUNT(t.id)::int AS tables
+        `SELECT f.id, f.name, f.sort_order,
+                (SELECT COUNT(*)::int FROM restaurant_tables t
+                  WHERE t.floor_id = f.id AND t.kind = 'table') AS tables
            FROM floors f
-           LEFT JOIN restaurant_tables t ON t.floor_id = f.id AND t.kind = 'table'
-          GROUP BY f.id
           ORDER BY f.sort_order ASC, f.id ASC`,
       ),
     )
     res.json(result.rows.map((row) => ({ ...serializeFloor(row), tables: row.tables })))
   } catch (err) {
-    next(err)
+    // Last resort: the list of floors is an extra, never a reason to fail.
+    console.error('Floors could not be read, answering with the ground floor only:', err)
+    try {
+      const count = await pool.query("SELECT COUNT(*)::int AS n FROM restaurant_tables WHERE kind = 'table'")
+      res.json([{ id: 'ground', name: 'Ground floor', tables: count.rows[0].n }])
+    } catch (inner) {
+      next(inner)
+    }
   }
 })
 
