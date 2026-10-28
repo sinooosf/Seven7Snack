@@ -101,6 +101,13 @@ export async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_orders_table_status ON orders(table_id, status);
   `)
 
+  // The dashboard asks "which orders are still open?" every few seconds
+  // (the red badge, the bell, the Orders page). This index answers it without
+  // reading the whole orders table.
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders(status, created_at DESC);
+  `)
+
   // A note the customer writes for the kitchen ("no onions"), a short line of
   // text under each dish on the menu, and the "Call waiter" button.
   await pool.query(`

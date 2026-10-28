@@ -24,9 +24,10 @@ export async function loadChatbotFaqs() {
 // customer chose) and always answers in the CHOSEN language.
 import { translate } from '../../i18n/translate'
 import { itemName } from '../../i18n/menuText'
+import { CONTACT } from '../../data/contact'
 
 export const quickQuestions = (lang = 'en') =>
-  ['name', 'best', 'available', 'hours'].map((id) => translate(lang, `chat.quick.${id}`))
+  ['name', 'best', 'available', 'hours', 'contact'].map((id) => translate(lang, `chat.quick.${id}`))
 
 // English list kept for backwards compatibility.
 export const QUICK_QUESTIONS = quickQuestions('en')
@@ -49,14 +50,16 @@ function normalize(text) {
 const RULES = [
   // "Where is the waiter?" -> tell them about the button.
   { id: 'waiter', words: ['waiter', 'waitress', 'serveur', 'serveuse', 'garcon', 'نادل', 'جرسون', 'ويتر', 'نادلة'] },
-  // The manager's / restaurant's phone, e-mail, address... (placeholder data
-  // lives in i18n/locales/chatbot.js — replace it with the real details).
+  // Phone, Instagram, TikTok, delivery... The real details live in
+  // data/contact.js; the answer shows them as tap-to-call / tap-to-open buttons.
   {
     id: 'contact',
     words: [
       'contact', 'manager', 'gerant', 'responsable', 'directeur', 'phone', 'telephone', 'whatsapp',
       'email', 'e-mail', 'address', 'adresse', 'info', 'joindre', 'appeler', 'your number', 'votre numero', 'ton numero',
+      'instagram', 'tiktok', 'tik tok', 'social', 'reseaux', 'delivery', 'livraison', 'livrer',
       'رقم', 'هاتف', 'تلفون', 'مدير', 'مسؤول', 'اتصال', 'اتصل', 'تواصل', 'عنوان', 'معلومات', 'واتساب', 'بريد', 'ايميل',
+      'انستغرام', 'انستقرام', 'تيك توك', 'تيكتوك', 'توصيل',
     ],
     pattern: /\b(num|nbr|numero)\b/,
   },
@@ -76,6 +79,19 @@ const RULES = [
   { id: 'hours', words: ['time', 'close', 'open', 'hour', 'heure', 'ferm', 'ouvert', 'ouvre', 'horaire', 'وقت', 'اوقات', 'ساعات', 'ساعه', 'مفتوح', 'تفتح', 'تغلق', 'تقفل', 'اغلاق', 'دوام', 'مواعيد'] },
 ].map((rule) => ({ ...rule, words: rule.words.map(normalize) }))
 
+// The tap-to-call / tap-to-open buttons shown under the contact answer.
+function contactActions(lang) {
+  return [
+    ...CONTACT.phones.map((phone) => ({
+      kind: 'call',
+      href: `tel:${phone.tel}`,
+      label: translate(lang, 'chat.act.call', { number: phone.display }),
+    })),
+    { kind: 'instagram', href: CONTACT.instagram.url, label: `Instagram · ${CONTACT.instagram.handle}` },
+    { kind: 'tiktok', href: CONTACT.tiktok.url, label: `TikTok · ${CONTACT.tiktok.handle}` },
+  ]
+}
+
 export function getBotResponse(rawText, lang = 'en') {
   const text = normalize(rawText)
   const say = (key, params) => translate(lang, key, params)
@@ -86,7 +102,7 @@ export function getBotResponse(rawText, lang = 'en') {
 
   switch (rule?.id) {
     case 'waiter': return { text: say('chat.r.waiter') }
-    case 'contact': return { text: say('chat.r.contact') }
+    case 'contact': return { text: say('chat.r.contact'), richContent: { type: 'contact', actions: contactActions(lang) } }
     case 'name': return { text: say('chat.r.name') }
     case 'help': return { text: say('chat.r.help') }
     case 'how': return { text: say('chat.r.how') }

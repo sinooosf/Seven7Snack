@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { useAdminAuth } from '../AdminAuthContext'
 import { adminFetchOverview } from '../../services/api'
+import { overviewPath, peek } from '../../services/adminCache'
+import { startPolling } from '../usePolling'
 import { useLanguage } from '../../i18n/LanguageContext'
 import SalesChart from '../components/SalesChart'
 import {
@@ -36,13 +38,14 @@ export default function AdminOverview() {
   const { password } = useAdminAuth()
   const [range, setRange] = useState('today')
   const [metric, setMetric] = useState('orders')
-  const [data, setData] = useState(null)
+  // Opens with the last answer on screen (if any); the fresh one replaces it.
+  const [data, setData] = useState(() => peek(overviewPath('today')))
   const [error, setError] = useState('')
   const { t } = useLanguage()
 
   useEffect(() => {
     let cancelled = false
-    setData(null)
+    setData(peek(overviewPath(range)))
 
     async function load() {
       try {
@@ -56,11 +59,10 @@ export default function AdminOverview() {
       }
     }
 
-    load()
-    const timer = setInterval(load, POLL_MS)
+    const stop = startPolling(load, POLL_MS)
     return () => {
       cancelled = true
-      clearInterval(timer)
+      stop()
     }
   }, [password, range])
 

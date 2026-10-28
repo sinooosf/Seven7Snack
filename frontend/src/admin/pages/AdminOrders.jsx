@@ -28,6 +28,8 @@ import {
   adminFetchOverview,
   adminUpdateOrderStatus,
 } from '../../services/api'
+import { ordersPath, overviewPath, peek } from '../../services/adminCache'
+import { startPolling } from '../usePolling'
 import {
   Card,
   CardTitle,
@@ -63,8 +65,9 @@ export default function AdminOrders() {
   const { t, lang } = useLanguage()
 
   const [range, setRange] = useState('today')
-  const [data, setData] = useState(null)
-  const [overview, setOverview] = useState(null)
+  // Opens with the last answer on screen (if any); the fresh one replaces it.
+  const [data, setData] = useState(() => peek(ordersPath('today')))
+  const [overview, setOverview] = useState(() => peek(overviewPath('today')))
   const [error, setError] = useState('')
   // /admin/orders?q=1023 opens the page already searching for that order
   const [params] = useSearchParams()
@@ -89,20 +92,31 @@ export default function AdminOrders() {
   }, [password, range])
 
   useEffect(() => {
-    setData(null)
-    load()
-    const timer = setInterval(load, POLL_MS)
-    return () => clearInterval(timer)
-  }, [load])
+    setData(peek(ordersPath(range)))
+    setOverview(peek(overviewPath(range)))
+    return startPolling(load, POLL_MS)
+  }, [load, range])
 
   async function changeStatus(order, next) {
     setBusyId(order.id)
+    // Show the new status right away; the server's answer (and the refresh
+    // below) confirms it. If the server says no, the refresh puts it back.
+    const show = (changed) =>
+      setData((current) =>
+        current ? { ...current, orders: current.orders.map((o) => (o.id === order.id ? changed : o)) } : current
+      )
+    show({ ...order, status: next })
     try {
       const updated = await adminUpdateOrderStatus(password, order.id, next)
+      show(updated)
       setSelected((current) => (current && current.id === updated.id ? updated : current))
-      await Promise.all([load(), refreshSummary()])
+      // Refresh the totals and the badge in the background — the click does
+      // not have to wait for them.
+      load()
+      refreshSummary()
     } catch (err) {
       setError(err.message)
+      load()
     } finally {
       setBusyId(null)
     }

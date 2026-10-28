@@ -10,6 +10,8 @@ import {
 } from 'lucide-react'
 import { useAdminAuth } from '../AdminAuthContext'
 import { adminFetchReport } from '../../services/api'
+import { peek, reportPath } from '../../services/adminCache'
+import { startPolling } from '../usePolling'
 import { useLanguage } from '../../i18n/LanguageContext'
 import ReportsChart from '../components/ReportsChart'
 import { Card, CardTitle, ErrorBanner, PageTop, Spinner, StatCard } from '../components/ui'
@@ -38,7 +40,8 @@ export default function AdminReports() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [metric, setMetric] = useState('revenue')
-  const [data, setData] = useState(null)
+  // Opens with the last answer on screen (if any); the fresh one replaces it.
+  const [data, setData] = useState(() => peek(reportPath({ range: 'week' })))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -49,6 +52,9 @@ export default function AdminReports() {
 
     let cancelled = false
     setLoading(true)
+    // A page already looked at shows at once while it refreshes.
+    const known = peek(reportPath({ range, from, to }))
+    if (known) setData(known)
 
     async function load() {
       try {
@@ -63,11 +69,10 @@ export default function AdminReports() {
       }
     }
 
-    load()
-    const timer = setInterval(load, POLL_MS)
+    const stop = startPolling(load, POLL_MS)
     return () => {
       cancelled = true
-      clearInterval(timer)
+      stop()
     }
   }, [password, range, from, to, problem])
 
