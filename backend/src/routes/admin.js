@@ -1,10 +1,7 @@
 import express, { Router } from 'express'
 import { pool } from '../db.js'
 import { requireAdmin, checkAdminPassword, sendAuthError } from '../middleware/auth.js'
-import { DELIVERY_TABLE_ID, HOME_TABLE_ID } from '../links.js'
-import { ensureFloors } from '../migrate.js'
-import { markCategoryRemoved, markItemRemoved, removedCategoryIds, restoreRemovedCategories, unmarkCategoryRemoved } from '../menuSync.js'
-import { CATEGORIES as SEED_CATEGORIES } from '../menuData.js'
+import { HOME_TABLE_ID } from '../migrate.js'
 import { TZ, dayStartSql, TABLE_ORDER_SQL } from '../time.js'
 import { daysBetween, resolveRange } from '../reportRange.js'
 import { placeOrder } from '../placeOrder.js'
@@ -12,7 +9,6 @@ import { getVapid } from '../push.js'
 import { MAX_DISH_NOTE, checkDish, cleanNote, isInt, isText, normalizeTableId, numericId, safeTextId } from '../validate.js'
 import {
   serializeCategory,
-  serializeFloor,
   serializeMenuItem,
   serializeTable,
   serializeFaq,
@@ -103,169 +99,38 @@ async function dropUnusedUpload(imagePath) {
   )
 }
 
-// Where a category sits in the customer's menu: 'first' | 'last', or one step
-// 'up' | 'down'. Rewrites sort_order 0..n-1 so there are never ties.
-const CATEGORY_POSITIONS = ['first', 'last', 'up', 'down']
-
-async function writeCategoryOrder(db, ids) {
-  await db.query(
-    `UPDATE categories c SET sort_order = x.n - 1
-       FROM unnest($1::text[]) WITH ORDINALITY AS x(id, n)
-      WHERE c.id = x.id`,
-    [ids],
-  )
-}
-
-async function categoryIdsInOrder(db) {
-  const { rows } = await db.query('SELECT id FROM categories ORDER BY sort_order ASC, id ASC')
-  return rows.map((r) => r.id)
-}
-
-async function moveCategory(db, id, position) {
-  const ids = await categoryIdsInOrder(db)
-  const from = ids.indexOf(id)
-  if (from === -1) return false
-
-  let to = from
-  if (position === 'first') to = 0
-  else if (position === 'last') to = ids.length - 1
-  else if (position === 'up') to = Math.max(0, from - 1)
-  else if (position === 'down') to = Math.min(ids.length - 1, from + 1)
-
-  ids.splice(from, 1)
-  ids.splice(to, 0, id)
-  await writeCategoryOrder(db, ids)
-  return true
-}
-
-const checkCategoryText = (body) => {
-  const { name, image, description, position } = body
-  if (name !== undefined && !isText(name, 80)) return 'The name must be 1–80 characters.'
-  if (image !== undefined && !isText(image, 500)) return 'The picture is not valid.'
-  if (description !== undefined && (typeof description !== 'string' || description.length > 200 || description.includes('\u0000'))) {
-    return 'The description must be text of at most 200 characters.'
-  }
-  if (position !== undefined && !CATEGORY_POSITIONS.includes(position)) return 'position must be first, last, up or down.'
-  return null
-}
-
-// Categories from menuData.js that the staff removed (so the dashboard can offer
-// "Restore"), and the restore itself: they come back with their starting dishes.
-router.get('/categories/removed', async (req, res, next) => {
-  try {
-    const removed = new Set(await removedCategoryIds(pool))
-    res.json(SEED_CATEGORIES.filter((c) => removed.has(c.id)).map((c) => serializeCategory({ ...c })))
-  } catch (err) {
-    next(err)
-  }
-})
-
-router.post('/categories/restore', async (req, res, next) => {
-  try {
-    res.json(await restoreRemovedCategories())
-  } catch (err) {
-    next(err)
-  }
-})
-
 router.post('/categories', async (req, res, next) => {
-  const client = await pool.connect()
   try {
-    const body = req.body && typeof req.body === 'object' ? req.body : {}
-    const { id, name, image, description, position } = body
-    if (id !== undefined && !isText(id, 80)) {
+    const { id, name, image, description } = req.body || {}
+    if (!isText(name, 80) || (id !== undefined && !isText(id, 80)) || (image !== undefined && !isText(image, 500)) || (description !== undefined && typeof description !== 'string')) {
       return res.status(400).json({ error: 'A category needs a name (up to 80 characters).' })
     }
-    if (!isText(name, 80)) return res.status(400).json({ error: 'A category needs a name (up to 80 characters).' })
-    const problem = checkCategoryText(body)
-    if (problem) return res.status(400).json({ error: problem })
-    if (position !== undefined && !['first', 'last'].includes(position)) {
-      return res.status(400).json({ error: 'position must be first or last.' })
-    }
-
-    let slug = String(id || name || '')
+    const slug = String(id || name || '')
       .trim()
       .toLowerCase()
-      .normalize('NFKD')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
-    if (!slug) {
-      // A name with no latin letters (e.g. Arabic) still gets a unique id;
-      // a name with no letters or digits at all ("!!!") is refused.
-      if (!/[\p{L}\p{N}]/u.test(String(name))) return res.status(400).json({ error: 'A category needs a name.' })
-      slug = `category-${Math.random().toString(16).slice(2, 8)}`
+
+    if (!slug || !name?.trim()) {
+      return res.status(400).json({ error: 'A category needs a name.' })
     }
 
-    await client.query('BEGIN')
-    const next_sort = await client.query('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM categories')
-    const result = await client.query(
+    const next_sort = await pool.query('SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM categories')
+    const result = await pool.query(
       `INSERT INTO categories (id, name, image, description, sort_order)
        VALUES ($1,$2,$3,$4,$5) RETURNING *`,
       [slug, name.trim(), image || '/logo.png', description?.trim() || '', next_sort.rows[0].n],
     )
-    if (position === 'first') await moveCategory(client, slug, 'first')
-    // If this id was removed earlier, the staff want it back: the menu file may seed it again.
-    await unmarkCategoryRemoved(client, slug)
-    const fresh = await client.query('SELECT * FROM categories WHERE id = $1', [slug])
-    await client.query('COMMIT')
-    res.status(201).json(serializeCategory(fresh.rows[0]))
+    res.status(201).json(serializeCategory(result.rows[0]))
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {})
     if (err.code === '23505') return res.status(409).json({ error: 'That category already exists.' })
     next(err)
-  } finally {
-    client.release()
-  }
-})
-
-// Edit a category: any of name, image, description, and its position in the
-// menu ('first' | 'last' | 'up' | 'down'). Only what is sent changes.
-router.put('/categories/:id', async (req, res, next) => {
-  const client = await pool.connect()
-  try {
-    const body = req.body && typeof req.body === 'object' ? req.body : {}
-    const problem = checkCategoryText(body)
-    if (problem) return res.status(400).json({ error: problem })
-    const { name, image, description, position } = body
-
-    await client.query('BEGIN')
-    const before = await client.query('SELECT * FROM categories WHERE id = $1 FOR UPDATE', [req.params.id])
-    if (before.rows.length === 0) {
-      await client.query('ROLLBACK').catch(() => {})
-      return res.status(404).json({ error: 'Category not found.' })
-    }
-
-    await client.query(
-      `UPDATE categories SET
-         name        = COALESCE($1, name),
-         image       = COALESCE($2, image),
-         description = COALESCE($3, description)
-       WHERE id = $4`,
-      [name === undefined ? null : name.trim(), image ?? null, description === undefined ? null : description.trim(), req.params.id],
-    )
-    if (position !== undefined) await moveCategory(client, req.params.id, position)
-
-    const fresh = await client.query('SELECT * FROM categories WHERE id = $1', [req.params.id])
-    await client.query('COMMIT')
-
-    // The old uploaded picture (if any) is no longer used: free the space.
-    if (image !== undefined && before.rows[0].image !== fresh.rows[0].image) {
-      await dropUnusedUpload(before.rows[0].image).catch(() => {})
-    }
-    res.json(serializeCategory(fresh.rows[0]))
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {})
-    next(err)
-  } finally {
-    client.release()
   }
 })
 
 // A category that still has dishes is only deleted when the dashboard asks
 // for it explicitly with ?withDishes=true — the dishes are removed with it.
 // Past orders are not affected (order lines keep their own name and price).
-// The removal is remembered, so a category that also comes from menuData.js
-// is not brought back by the next restart.
 router.delete('/categories/:id', async (req, res, next) => {
   const withDishes = req.query.withDishes === 'true'
   const client = await pool.connect()
@@ -284,10 +149,6 @@ router.delete('/categories/:id', async (req, res, next) => {
       await client.query('ROLLBACK').catch(() => {})
       return res.status(404).json({ error: 'Category not found.' })
     }
-    await markCategoryRemoved(client, req.params.id)
-
-    // Close the gap in the order (0..n-1).
-    await writeCategoryOrder(client, await categoryIdsInOrder(client))
     await client.query('COMMIT')
 
     // Free the space of the uploaded pictures (category + its dishes) now unused.
@@ -329,12 +190,9 @@ router.post('/menu-items', async (req, res, next) => {
     const slug = String(name).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'dish'
     const newId = id || `${slug}-${Math.random().toString(16).slice(2, 6)}`
 
-    // A new dish goes at the end of its category.
     const result = await pool.query(
-      `INSERT INTO menu_items (id, category_id, name, price, image, available, discount_percent, is_best, description, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,
-               (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM menu_items WHERE category_id = $2))
-       RETURNING *`,
+      `INSERT INTO menu_items (id, category_id, name, price, image, available, discount_percent, is_best, description)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
       [newId, categoryId, name, price, image, available ?? true, discountPercent ?? 0, isBest ?? false, cleanNote(description, MAX_DISH_NOTE).value],
     )
     res.status(201).json(serializeMenuItem(result.rows[0]))
@@ -382,112 +240,9 @@ router.delete('/menu-items/:id', async (req, res, next) => {
   try {
     const result = await pool.query('DELETE FROM menu_items WHERE id = $1 RETURNING id, image', [req.params.id])
     if (result.rows.length === 0) return res.status(404).json({ error: 'Menu item not found.' })
-    // A starting dish that was removed must not come back at the next restart.
-    await markItemRemoved(pool, req.params.id)
     await dropUnusedUpload(result.rows[0].image).catch(() => {})
     res.json({ ok: true })
   } catch (err) {
-    next(err)
-  }
-})
-
-// ---------------------------------------------------------------------
-// Floors ("Ground floor", "Upper floor"...). Every table sits on one floor;
-// the Tables page shows one floor plan per floor.
-// ---------------------------------------------------------------------
-// If the floors table (or the dining_floor column) is missing or incomplete, repair
-// it and try once more — a floors problem must never break the Tables page.
-async function withFloorsRepair(task) {
-  try {
-    return await task()
-  } catch (err) {
-    if (err.code !== '42P01' && err.code !== '42703' && err.code !== '23503') throw err
-    await ensureFloors()
-    return task()
-  }
-}
-
-router.get('/floors', async (req, res, next) => {
-  try {
-    // Plain sub-select (no GROUP BY) so an odd floors table cannot break it.
-    const result = await withFloorsRepair(() =>
-      pool.query(
-        `SELECT f.id, f.name, f.sort_order,
-                (SELECT COUNT(*)::int FROM restaurant_tables t
-                  WHERE t.dining_floor = f.id AND t.kind = 'table') AS tables
-           FROM dining_floors f
-          ORDER BY f.sort_order ASC, f.id ASC`,
-      ),
-    )
-    res.json(result.rows.map((row) => ({ ...serializeFloor(row), tables: row.tables })))
-  } catch (err) {
-    // Last resort: the list of floors is an extra, never a reason to fail.
-    console.error('Floors could not be read, answering with the ground floor only:', err)
-    try {
-      const count = await pool.query("SELECT COUNT(*)::int AS n FROM restaurant_tables WHERE kind = 'table'")
-      res.json([{ id: 'ground', name: 'Ground floor', tables: count.rows[0].n }])
-    } catch (inner) {
-      next(inner)
-    }
-  }
-})
-
-router.post('/floors', async (req, res, next) => {
-  try {
-    const { name } = req.body || {}
-    if (!isText(name, 60)) return res.status(400).json({ error: 'A floor needs a name (up to 60 characters).' })
-
-    const base =
-      String(name).trim().toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) ||
-      'floor'
-    const result = await withFloorsRepair(async () => {
-      let id = base
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const taken = await pool.query('SELECT 1 FROM dining_floors WHERE id = $1', [id])
-        if (taken.rows.length === 0) break
-        id = `${base}-${Math.random().toString(16).slice(2, 6)}`
-      }
-      return pool.query(
-        `INSERT INTO dining_floors (id, name, sort_order)
-         VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM dining_floors)) RETURNING *`,
-        [id, String(name).trim()],
-      )
-    })
-    res.status(201).json({ ...serializeFloor(result.rows[0]), tables: 0 })
-  } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'That floor already exists.' })
-    next(err)
-  }
-})
-
-router.patch('/floors/:id', async (req, res, next) => {
-  try {
-    const { name } = req.body || {}
-    if (!isText(name, 60)) return res.status(400).json({ error: 'A floor needs a name (up to 60 characters).' })
-    const result = await pool.query('UPDATE dining_floors SET name = $1 WHERE id = $2 RETURNING *', [String(name).trim(), req.params.id])
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Floor not found.' })
-    res.json(serializeFloor(result.rows[0]))
-  } catch (err) {
-    next(err)
-  }
-})
-
-// A floor can only be removed when it has no tables, and the last floor stays.
-router.delete('/floors/:id', async (req, res, next) => {
-  try {
-    const count = await pool.query('SELECT COUNT(*)::int AS n FROM dining_floors')
-    if (count.rows[0].n <= 1) return res.status(400).json({ error: 'The last floor cannot be removed.' })
-
-    const used = await pool.query('SELECT 1 FROM restaurant_tables WHERE dining_floor = $1 AND kind = $2 LIMIT 1', [req.params.id, 'table'])
-    if (used.rows.length > 0) {
-      return res.status(409).json({ error: 'This floor still has tables. Move or remove them first.' })
-    }
-
-    const result = await pool.query('DELETE FROM dining_floors WHERE id = $1 RETURNING id', [req.params.id])
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Floor not found.' })
-    res.json({ ok: true })
-  } catch (err) {
-    if (err.code === '23503') return res.status(409).json({ error: 'This floor still has tables. Move or remove them first.' })
     next(err)
   }
 })
@@ -502,7 +257,7 @@ router.delete('/floors/:id', async (req, res, next) => {
 const OPEN_STATUSES = ['preparing', 'almost', 'ready']
 
 function tableState(row, hasOrder) {
-  if (row.kind !== 'table') return row.kind // 'home' | 'delivery' links
+  if (row.kind === 'home') return 'home'
   if (row.status === 'out_of_service') return 'out_of_service'
   if (hasOrder) return 'occupied'
   if (row.status === 'cleaning') return 'cleaning'
@@ -557,10 +312,7 @@ router.get('/tables', async (req, res, next) => {
 
 router.post('/tables', async (req, res, next) => {
   try {
-    const { id, label, seats, floorId } = req.body || {}
-    if (floorId !== undefined && floorId !== null && !isText(floorId, 80)) {
-      return res.status(400).json({ error: 'That floor does not exist.' })
-    }
+    const { id, label, seats } = req.body || {}
     if ((typeof id !== 'string' && typeof id !== 'number') || (label !== undefined && label !== null && !isText(label, 60))) {
       return res.status(400).json({ error: 'id is required, e.g. "6".' })
     }
@@ -574,21 +326,12 @@ router.post('/tables', async (req, res, next) => {
     if (cleanId.toLowerCase() === HOME_TABLE_ID) {
       return res.status(400).json({ error: '"home" is reserved for the ToHomeOrder link.' })
     }
-    if (cleanId.toLowerCase() === DELIVERY_TABLE_ID) {
-      return res.status(400).json({ error: '"delivery" is reserved for the delivery link.' })
-    }
-
-    // No floor given -> the first one (the ground floor).
-    const floor = floorId
-      ? await pool.query('SELECT id FROM dining_floors WHERE id = $1', [floorId])
-      : await pool.query('SELECT id FROM dining_floors ORDER BY sort_order ASC, id ASC LIMIT 1')
-    if (floor.rows.length === 0) return res.status(400).json({ error: 'That floor does not exist.' })
 
     const seatCount = Math.min(Math.max(Math.trunc(Number(seats)) || 4, 1), 20)
 
     const result = await pool.query(
-      'INSERT INTO restaurant_tables (id, label, seats, dining_floor) VALUES ($1, $2, $3, $4) RETURNING *',
-      [cleanId, String(label || '').trim() || `Table ${cleanId}`, seatCount, floor.rows[0].id],
+      'INSERT INTO restaurant_tables (id, label, seats) VALUES ($1, $2, $3) RETURNING *',
+      [cleanId, String(label || '').trim() || `Table ${cleanId}`, seatCount],
     )
     res.status(201).json(serializeTable(result.rows[0]))
   } catch (err) {
@@ -603,14 +346,7 @@ const pct = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(Math.
 // Change seats / label, or set the manual status (auto | cleaning | out_of_service).
 router.patch('/tables/:id', async (req, res, next) => {
   try {
-    const { seats, label, status, posX, posY, floorId } = req.body || {}
-    if (floorId !== undefined && floorId !== null && !isText(floorId, 80)) {
-      return res.status(400).json({ error: 'That floor does not exist.' })
-    }
-    if (floorId !== undefined && floorId !== null) {
-      const known = await pool.query('SELECT 1 FROM dining_floors WHERE id = $1', [floorId])
-      if (known.rows.length === 0) return res.status(400).json({ error: 'That floor does not exist.' })
-    }
+    const { seats, label, status, posX, posY } = req.body || {}
     if (label !== undefined && label !== null && !isText(label, 60)) {
       return res.status(400).json({ error: 'The label must be 1–60 characters.' })
     }
@@ -629,18 +365,15 @@ router.patch('/tables/:id', async (req, res, next) => {
          seats  = COALESCE($1, seats),
          label  = COALESCE($2, label),
          status = COALESCE($3, status),
-         -- moving to another floor puts the table back on the automatic grid there
-         pos_x  = CASE WHEN $7::text IS NOT NULL AND $7::text <> dining_floor THEN NULL ELSE COALESCE($5, pos_x) END,
-         pos_y  = CASE WHEN $7::text IS NOT NULL AND $7::text <> dining_floor THEN NULL ELSE COALESCE($6, pos_y) END,
-         dining_floor = COALESCE($7::text, dining_floor)
+         pos_x  = COALESCE($5, pos_x),
+         pos_y  = COALESCE($6, pos_y)
        WHERE id = $4 AND kind = 'table'
        RETURNING *`,
-      [seatCount, (typeof label === 'string' ? label.trim() : '') || null, status ?? null, req.params.id, pct(posX), pct(posY), floorId ?? null],
+      [seatCount, (typeof label === 'string' ? label.trim() : '') || null, status ?? null, req.params.id, pct(posX), pct(posY)],
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'Table not found.' })
     res.json(serializeTable(result.rows[0]))
   } catch (err) {
-    if (err.code === '23503') return res.status(400).json({ error: 'That floor does not exist.' })
     next(err)
   }
 })
@@ -649,9 +382,6 @@ router.delete('/tables/:id', async (req, res, next) => {
   try {
     if (req.params.id === HOME_TABLE_ID) {
       return res.status(400).json({ error: 'The ToHomeOrder link is built in and cannot be removed.' })
-    }
-    if (req.params.id === DELIVERY_TABLE_ID) {
-      return res.status(400).json({ error: 'The delivery link is built in and cannot be removed.' })
     }
 
     const busy = await pool.query(
@@ -957,10 +687,6 @@ router.patch('/orders/:id/move', numericId, async (req, res, next) => {
       await client.query('ROLLBACK').catch(() => {})
       return res.status(404).json({ error: 'Order not found.' })
     }
-    if (order.table_id === DELIVERY_TABLE_ID) {
-      await client.query('ROLLBACK').catch(() => {})
-      return res.status(409).json({ error: 'A delivery order cannot be moved to a table.' })
-    }
     if (!OPEN_STATUSES.includes(order.status)) {
       await client.query('ROLLBACK').catch(() => {})
       return res.status(409).json({ error: 'Only an order in progress can be moved.' })
@@ -1015,10 +741,6 @@ router.post('/orders/merge', async (req, res, next) => {
     if (!from || !into) {
       await client.query('ROLLBACK').catch(() => {})
       return res.status(404).json({ error: 'Order not found.' })
-    }
-    if (from.table_id === DELIVERY_TABLE_ID || into.table_id === DELIVERY_TABLE_ID) {
-      await client.query('ROLLBACK').catch(() => {})
-      return res.status(409).json({ error: 'Delivery orders cannot be merged: each one has its own address.' })
     }
     if (!OPEN_STATUSES.includes(from.status) || !OPEN_STATUSES.includes(into.status)) {
       await client.query('ROLLBACK').catch(() => {})

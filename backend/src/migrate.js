@@ -9,40 +9,8 @@
 // ---------------------------------------------------------------------------
 import { pool } from './db.js'
 import { TZ } from './time.js'
-import { HOME_TABLE_ID, DELIVERY_TABLE_ID } from './links.js'
 
-export { HOME_TABLE_ID, DELIVERY_TABLE_ID }
-
-// Floors of the restaurant ("Ground floor", "Upper floor"...). Every table
-// belongs to one. Existing tables stay on the ground floor. Safe to run any
-// number of times; also called by the floors routes if they find it missing.
-export async function ensureFloors() {
-  // Brand-new names on purpose (dining_floors / dining_floor, no foreign key):
-  // an older version of this feature left a differently-shaped "floors" table and
-  // "floor_id" column in some databases, and those must not get in the way.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS dining_floors (
-      id          TEXT PRIMARY KEY,
-      name        TEXT NOT NULL,
-      sort_order  INTEGER NOT NULL DEFAULT 0
-    );
-    INSERT INTO dining_floors (id, name, sort_order) VALUES ('ground', 'Ground floor', 0)
-      ON CONFLICT (id) DO NOTHING;
-    ALTER TABLE restaurant_tables ADD COLUMN IF NOT EXISTS dining_floor TEXT NOT NULL DEFAULT 'ground';
-
-    -- Make the old column (if an older version made one) harmless: nothing reads
-    -- it any more, so it must never block adding a table.
-    DO $$
-    BEGIN
-      IF EXISTS (SELECT 1 FROM information_schema.columns
-                  WHERE table_name = 'restaurant_tables' AND column_name = 'floor_id') THEN
-        ALTER TABLE restaurant_tables ALTER COLUMN floor_id DROP NOT NULL;
-        ALTER TABLE restaurant_tables ALTER COLUMN floor_id DROP DEFAULT;
-      END IF;
-    EXCEPTION WHEN others THEN NULL;
-    END $$;
-  `)
-}
+export const HOME_TABLE_ID = 'home'
 
 export async function ensureSchema() {
   // Newer table columns
@@ -70,23 +38,6 @@ export async function ensureSchema() {
     [HOME_TABLE_ID],
   )
 
-  // The special "delivery" link: the customer orders normally, then gives a
-  // phone number and an address when confirming.
-  await pool.query(
-    `INSERT INTO restaurant_tables (id, label, kind, seats)
-     VALUES ($1, 'Delivery', 'delivery', 0)
-     ON CONFLICT (id) DO UPDATE SET kind = 'delivery', label = 'Delivery'`,
-    [DELIVERY_TABLE_ID],
-  )
-
-  await ensureFloors()
-
-  // Delivery orders carry the customer's phone number and address.
-  await pool.query(`
-    ALTER TABLE orders ADD COLUMN IF NOT EXISTS phone    TEXT NOT NULL DEFAULT '';
-    ALTER TABLE orders ADD COLUMN IF NOT EXISTS address  TEXT NOT NULL DEFAULT '';
-  `)
-
   await pool.query(`
     CREATE TABLE IF NOT EXISTS uploads (
       id          SERIAL PRIMARY KEY,
@@ -99,10 +50,6 @@ export async function ensureSchema() {
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_orders_table_status ON orders(table_id, status);
-    -- The status counts on the dashboard stay instant however many orders there are.
-    -- (Numbering the next order is already instant thanks to the UNIQUE
-    -- idx_orders_day_number index created further down.)
-    CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
   `)
 
   // A note the customer writes for the kitchen ("no onions"), a short line of

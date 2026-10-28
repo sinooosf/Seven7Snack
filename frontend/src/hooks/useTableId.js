@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { fetchTableAvailability, isKnownTable, isOpenLink, tableIdFromPath, verifyTable } from '../data/tables'
+import { HOME_TABLE_ID, fetchTableAvailability, isKnownTable, tableIdFromPath, verifyTable } from '../data/tables'
 
 // How often the phone asks whether staff closed (or reopened) the table.
 const CLOSED_CHECK_MS = 5000
 const OPEN_CHECK_MS = 15000
 
-// Works for every kind of customer link: /table/:tableId, /ToHomeOrder and /delivery.
+// Works for both kinds of customer link: /table/:tableId and /ToHomeOrder.
 //
 // status:
 //   'valid'    the table exists — show the menu
@@ -29,8 +29,8 @@ export function useTableId() {
   const [closed, setClosed] = useState({ id: null, reason: null })
 
   useEffect(() => {
-    // The To Home and Delivery links have no table that could be cleaned.
-    if (tableId === null || isOpenLink(tableId)) return
+    // The To Home link has no table that could be cleaned.
+    if (tableId === null || tableId === HOME_TABLE_ID) return
 
     let cancelled = false
     let timer = null

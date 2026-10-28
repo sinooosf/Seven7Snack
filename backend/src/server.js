@@ -10,7 +10,6 @@ import chatbotRoutes from './routes/chatbot.js'
 import adminRoutes from './routes/admin.js'
 import uploadRoutes from './routes/uploads.js'
 import { ensureSchema } from './migrate.js'
-import { syncMenu } from './menuSync.js'
 
 const app = express()
 
@@ -70,11 +69,7 @@ app.use((err, req, res, next) => {
   }
 
   console.error(err)
-  // Dashboard routes are behind the staff password, so it is safe to say what
-  // went wrong there — it makes a broken database easy to diagnose.
-  const body = { error: 'Something went wrong on the server.' }
-  if (req.originalUrl.startsWith('/api/admin') && err?.message) body.detail = String(err.message).slice(0, 300)
-  res.status(500).json(body)
+  res.status(500).json({ error: 'Something went wrong on the server.' })
 })
 
 // A stray error in one request must never take the whole restaurant offline.
@@ -88,17 +83,8 @@ if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD.length < 12) {
 }
 
 // Bring an older database up to date (new columns, the To Home link...)
-// before accepting any request, and load the menu from menuData.js.
+// before accepting any request.
 ensureSchema()
-  .then(async () => {
-    try {
-      const menu = await syncMenu()
-      console.log(`Menu loaded from code: ${menu.categories} categories, ${menu.items} dishes.`)
-    } catch (err) {
-      // Never keep the restaurant offline over this: serve what the database has.
-      console.error('Could not sync the menu from menuData.js:', err)
-    }
-  })
   .then(() => {
     const server = app.listen(port, () => {
       console.log(`Meet The Chefs API running on http://localhost:${port}`)

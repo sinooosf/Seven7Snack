@@ -25,13 +25,11 @@ CREATE TABLE IF NOT EXISTS menu_items (
   sort_order        INTEGER NOT NULL DEFAULT 0
 );
 
--- (The floors live in ensureFloors() in migrate.js, which runs right after this file.)
-
 -- Named "restaurant_tables" because "table" is a reserved word in SQL.
 CREATE TABLE IF NOT EXISTS restaurant_tables (
   id          TEXT PRIMARY KEY,   -- matches the /table/:id link, e.g. '1'
   label       TEXT NOT NULL,      -- shown in the dashboard, e.g. "Table 1"
-  kind        TEXT NOT NULL DEFAULT 'table',  -- 'table' | 'home' (ToHomeOrder link) | 'delivery' (delivery link)
+  kind        TEXT NOT NULL DEFAULT 'table',  -- 'table' | 'home' (the special ToHomeOrder link)
   seats       INTEGER NOT NULL DEFAULT 4,
   status      TEXT NOT NULL DEFAULT 'auto',   -- 'auto' | 'cleaning' | 'out_of_service'
   pos_x       REAL,                           -- position on the floor plan, in % (null = automatic)
@@ -47,8 +45,6 @@ CREATE TABLE IF NOT EXISTS orders (
               CHECK (status IN ('preparing', 'almost', 'ready', 'completed', 'cancelled')),
   total       INTEGER NOT NULL,
   note        TEXT NOT NULL DEFAULT '',  -- the customer's note for the kitchen
-  phone       TEXT NOT NULL DEFAULT '',  -- delivery orders: the customer's phone number
-  address     TEXT NOT NULL DEFAULT '',  -- delivery orders: where to bring it
   -- The "#22" shown to staff and customer: counts the orders of one day and
   -- starts again at 1 after midnight. (See orders.js and migrate.js.)
   order_day     DATE,

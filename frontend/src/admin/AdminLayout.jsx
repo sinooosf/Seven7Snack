@@ -102,7 +102,7 @@ function Shell() {
 
         {/* Brand */}
         <div className="relative flex flex-col items-center px-5 pb-3 pt-5">
-          <img src="/logo.png" alt="Meet The Chefs" className="h-[112px] w-auto object-contain" />
+          <img src="/logo.png" alt="Meet The Chefs" className="h-[88px] w-auto object-contain" />
           <p className="mt-1 text-[11px] tracking-wide text-white/55">Good Food · Happy People</p>
         </div>
 
@@ -192,7 +192,7 @@ function MobileTopBar() {
       >
         <MenuIcon size={19} />
       </button>
-      <img src="/logo.png" alt="Meet The Chefs" className="h-11 w-auto shrink-0 object-contain" />
+      <img src="/logo.png" alt="Meet The Chefs" className="h-9 w-auto shrink-0 object-contain" />
       <p className="hidden min-w-0 flex-1 truncate text-sm font-semibold text-white/85 sm:block">{t(current.labelKey)}</p>
       {/* The day picker, language and bell of the current page are placed here */}
       <div ref={setTopbarSlot} className="ms-auto flex shrink-0 items-center gap-1.5 sm:gap-2" />

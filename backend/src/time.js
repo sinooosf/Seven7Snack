@@ -13,9 +13,9 @@ export function dayStartSql(tzParam, offset = 0) {
 }
 
 // Sort tables numerically (1, 2, 10 — not 1, 10, 2) with the special
-// links always last: "home" first, then "delivery".
+// "home" link always last.
 export const TABLE_ORDER_SQL = `
-  (CASE t.kind WHEN 'table' THEN 0 WHEN 'home' THEN 1 ELSE 2 END) ASC,
+  (t.kind = 'home') ASC,
   NULLIF(regexp_replace(t.id, '\\D', '', 'g'), '')::int ASC NULLS LAST,
   t.id ASC
 `

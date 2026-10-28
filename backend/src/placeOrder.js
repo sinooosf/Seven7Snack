@@ -14,7 +14,7 @@ import { pool } from './db.js'
 import { serializeOrder } from './serialize.js'
 import { TZ } from './time.js'
 import { unavailableReason } from './routes/tables.js'
-import { MAX_ORDER_NOTE, cleanAddress, cleanNote, cleanPhone, normalizeTableId, parseOrderLines } from './validate.js'
+import { MAX_ORDER_NOTE, cleanNote, normalizeTableId, parseOrderLines } from './validate.js'
 
 // Orders are numbered one after the other (#1, #2, #3...) and the count starts
 // again at 1 after midnight. Two orders placed at the same instant must never
@@ -43,22 +43,6 @@ export async function placeOrder(body) {
       return { status: 400, error: `Unknown table: ${tableId}` }
     }
 
-    // The delivery link needs a phone number and an address; every other
-    // kind of order ignores them.
-    let phone = ''
-    let address = ''
-    if (tableCheck.rows[0].kind === 'delivery') {
-      const phoneCheck = cleanPhone(body?.phone)
-      const addressCheck = cleanAddress(body?.address)
-      const problem = phoneCheck.error || addressCheck.error
-      if (problem) {
-        await client.query('ROLLBACK').catch(() => {})
-        return { status: 400, error: problem }
-      }
-      phone = phoneCheck.value
-      address = addressCheck.value
-    }
-
     // A menu that was already open on a phone (or a dashboard screen) must not
     // be able to order for a table the staff are cleaning or have taken out
     // of service.
@@ -73,16 +57,10 @@ export async function placeOrder(body) {
       }
     }
 
-    // One query for every dish of the order (not one per dish): fewer trips to
-    // the database means each order holds its connection for less time, which
-    // is what keeps the restaurant fast when many phones order at once.
-    const wantedIds = [...new Set(parsed.lines.map((line) => line.id))]
-    const found = await client.query('SELECT * FROM menu_items WHERE id = ANY($1::text[])', [wantedIds])
-    const byId = new Map(found.rows.map((row) => [row.id, row]))
-
     const resolvedLines = []
     for (const { id, quantity } of parsed.lines) {
-      const item = byId.get(id)
+      const itemResult = await client.query('SELECT * FROM menu_items WHERE id = $1', [id])
+      const item = itemResult.rows[0]
       if (!item) {
         await client.query('ROLLBACK').catch(() => {})
         return { status: 400, error: `Unknown menu item: ${String(id).slice(0, 60)}` }
@@ -101,32 +79,21 @@ export async function placeOrder(body) {
 
     const total = resolvedLines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0)
 
-    // The order and all of its lines in a single statement.
-    const inserted = await client.query(
-      `WITH new_order AS (
-         INSERT INTO orders (table_id, status, total, note, phone, address)
-         VALUES ($1, 'preparing', $2, $3, $4, $5)
-         RETURNING id
-       )
-       INSERT INTO order_items (order_id, item_id, name, quantity, unit_price)
-       SELECT new_order.id, l.item_id, l.name, l.quantity, l.unit_price
-         FROM new_order,
-              unnest($6::text[], $7::text[], $8::int[], $9::int[]) AS l(item_id, name, quantity, unit_price)
-       RETURNING order_id`,
-      [
-        tableId, total, note.value, phone, address,
-        resolvedLines.map((l) => l.id),
-        resolvedLines.map((l) => l.name),
-        resolvedLines.map((l) => l.quantity),
-        resolvedLines.map((l) => l.unitPrice),
-      ],
+    const orderResult = await client.query(
+      'INSERT INTO orders (table_id, status, total, note) VALUES ($1, $2, $3, $4) RETURNING *',
+      [tableId, 'preparing', total, note.value],
     )
-    const orderId = inserted.rows[0].order_id
+    let order = orderResult.rows[0]
+
+    for (const line of resolvedLines) {
+      await client.query(
+        'INSERT INTO order_items (order_id, item_id, name, quantity, unit_price) VALUES ($1,$2,$3,$4,$5)',
+        [order.id, line.id, line.name, line.quantity, line.unitPrice],
+      )
+    }
 
     // Give the order today's next number: 1 + the highest number used today
     // (today = the restaurant's own day, so it starts again at 1 after midnight).
-    // The lock is its own statement so the numbering query that follows sees
-    // every order committed while we were waiting for it.
     await client.query('SELECT pg_advisory_xact_lock($1)', [ORDER_NUMBER_LOCK])
     const numbered = await client.query(
       `UPDATE orders
@@ -135,9 +102,9 @@ export async function placeOrder(body) {
          FROM (SELECT (now() AT TIME ZONE $2)::date AS d) today
         WHERE orders.id = $1
         RETURNING orders.*`,
-      [orderId, TZ],
+      [order.id, TZ],
     )
-    const order = numbered.rows[0]
+    order = numbered.rows[0]
 
     await client.query('COMMIT')
     return {

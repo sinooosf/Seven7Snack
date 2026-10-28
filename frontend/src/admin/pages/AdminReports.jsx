@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { pollWhileVisible } from '../../utils/poll'
 import {
   Calendar,
   ChartColumn,
@@ -65,10 +64,10 @@ export default function AdminReports() {
     }
 
     load()
-    const stopPolling = pollWhileVisible(load, POLL_MS)
+    const timer = setInterval(load, POLL_MS)
     return () => {
       cancelled = true
-      stopPolling()
+      clearInterval(timer)
     }
   }, [password, range, from, to, problem])
 

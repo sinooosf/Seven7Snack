@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { pollWhileVisible } from '../../utils/poll'
 import { Link } from 'react-router-dom'
 import {
   Armchair,
@@ -58,10 +57,10 @@ export default function AdminOverview() {
     }
 
     load()
-    const stopPolling = pollWhileVisible(load, POLL_MS)
+    const timer = setInterval(load, POLL_MS)
     return () => {
       cancelled = true
-      stopPolling()
+      clearInterval(timer)
     }
   }, [password, range])
 

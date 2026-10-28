@@ -18,21 +18,21 @@ function renderCard(item) {
 
 describe('MenuItemCard', () => {
   it('shows the plain price when there is no discount', () => {
-    const item = MENU_ITEMS.find((i) => i.id === 'pizza-margherita') // 600 DH
+    const item = MENU_ITEMS.find((i) => i.id === 'pizza-1') // Margherita, 450 DH
     renderCard(item)
-    expect(screen.getByText('600 DH')).toBeInTheDocument()
+    expect(screen.getByText('450 DH')).toBeInTheDocument()
   })
 
   it('shows the discounted price and the crossed-out original price', () => {
-    const item = { ...MENU_ITEMS.find((i) => i.id === 'pizza-margherita'), discountPercent: 50 } // 600 DH, -50%
+    const item = MENU_ITEMS.find((i) => i.id === 'pizza-10') // Garden Veggie Deluxe, 550 DH, -50%
     renderCard(item)
-    expect(screen.getByText('300 DH')).toBeInTheDocument()
-    expect(screen.getByText('600 DH')).toBeInTheDocument()
+    expect(screen.getByText('275 DH')).toBeInTheDocument()
+    expect(screen.getByText('550 DH')).toBeInTheDocument()
     expect(screen.getByText('-50%')).toBeInTheDocument()
   })
 
   it('disables adding an unavailable item', () => {
-    const item = { ...MENU_ITEMS.find((i) => i.id === 'pizza-margherita'), available: false }
+    const item = MENU_ITEMS.find((i) => i.id === 'pizza-9') // marked unavailable
     renderCard(item)
     expect(screen.getByText('UNAVAILABLE')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /add/i })).not.toBeInTheDocument()
@@ -40,13 +40,13 @@ describe('MenuItemCard', () => {
 
   it('adding an item switches the card into quantity-stepper mode', async () => {
     const user = userEvent.setup()
-    const item = MENU_ITEMS.find((i) => i.id === 'burger-classic') // Burger Classic
+    const item = MENU_ITEMS.find((i) => i.id === 'drink-1') // Coca-Cola
     renderCard(item)
 
-    await user.click(screen.getByRole('button', { name: /^add burger classic$/i }))
+    await user.click(screen.getByRole('button', { name: /^add coca-cola$/i }))
 
     expect(screen.getByText('1')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /remove one burger classic/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /remove one coca-cola/i })).toBeInTheDocument()
   })
 })
 

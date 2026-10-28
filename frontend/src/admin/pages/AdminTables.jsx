@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { pollWhileVisible } from '../../utils/poll'
 import {
   Armchair,
   ChevronRight,
@@ -10,7 +9,6 @@ import {
   LayoutGrid,
   Link2,
   Minus,
-  Pencil,
   Plus,
   Trash2,
   UsersRound,
@@ -18,13 +16,9 @@ import {
 import { useLanguage } from '../../i18n/LanguageContext'
 import { useAdminAuth } from '../AdminAuthContext'
 import {
-  adminCreateFloor,
   adminCreateTable,
-  adminDeleteFloor,
   adminDeleteTable,
-  adminFetchFloors,
   adminFetchTables,
-  adminRenameFloor,
   adminUpdateTable,
 } from '../../services/api'
 import {
@@ -77,30 +71,16 @@ export default function AdminTables() {
   const { t, lang, tableLabel } = useLanguage()
 
   const [tables, setTables] = useState(null)
-  const [floors, setFloors] = useState([])
-  const [activeFloorId, setActiveFloorId] = useState(null)
   const [error, setError] = useState('')
-  const [floorsError, setFloorsError] = useState('')
   const [highlightId, setHighlightId] = useState(null)
-  const [dialog, setDialog] = useState(null) // 'add' | 'links' | 'addFloor' | 'renameFloor'
+  const [dialog, setDialog] = useState(null) // 'add' | 'links'
   const [menu, setMenu] = useState(null) // { id, x, y }
   const [busy, setBusy] = useState(false)
   const [localPos, setLocalPos] = useState({}) // positions being dragged / just dropped
 
   const load = useCallback(async () => {
     try {
-      // Floors are an extra: if they cannot be loaded the page still works
-      // (every table is then shown on one floor).
-      const [rows, floorRows] = await Promise.all([
-        adminFetchTables(password),
-        adminFetchFloors(password).catch((err) => {
-          setFloorsError(err.message)
-          return []
-        }),
-      ])
-      setTables(rows)
-      setFloors(floorRows)
-      if (floorRows.length > 0) setFloorsError('')
+      setTables(await adminFetchTables(password))
       setError('')
     } catch (err) {
       setError(err.message)
@@ -109,30 +89,15 @@ export default function AdminTables() {
 
   useEffect(() => {
     load()
-    return pollWhileVisible(load, POLL_MS)
+    const timer = setInterval(load, POLL_MS)
+    return () => clearInterval(timer)
   }, [load])
 
-  // Every real table (all floors), the one floor being shown, and the special links.
-  const allTables = useMemo(() => (tables || []).filter((tb) => (tb.kind || 'table') === 'table'), [tables])
-  const activeFloor = floors.find((f) => f.id === activeFloorId) || floors[0] || null
-  // The floor a table sits on. A table whose floor is unknown (missing, or not
-  // in the list of floors) is shown on the first floor — never hidden.
-  const floorIdOf = useCallback(
-    (tb) => {
-      const known = floors.find((f) => String(f.id) === String(tb.floorId))
-      return known ? known.id : floors[0]?.id ?? null
-    },
-    [floors],
-  )
-  const floor = useMemo(
-    () => allTables.filter((tb) => !activeFloor || floorIdOf(tb) === activeFloor.id),
-    [allTables, activeFloor, floorIdOf],
-  )
+  const floor = useMemo(() => (tables || []).filter((tb) => tb.kind !== 'home'), [tables])
   const homeLink = (tables || []).find((tb) => tb.kind === 'home')
-  const deliveryLink = (tables || []).find((tb) => tb.kind === 'delivery')
 
-  const count = (state) => allTables.filter((tb) => tb.state === state).length
-  const pct = (n) => (allTables.length ? Math.round((n / allTables.length) * 100) : 0)
+  const count = (state) => floor.filter((tb) => tb.state === state).length
+  const pct = (n) => (floor.length ? Math.round((n / floor.length) * 100) : 0)
 
   const positionOf = (table, index) =>
     localPos[table.id] ||
@@ -174,12 +139,6 @@ export default function AdminTables() {
     run(() => adminDeleteTable(password, table.id))
   }
 
-  function removeFloor() {
-    if (!activeFloor) return
-    if (!window.confirm(t('admin.tables.confirmRemoveFloor', { name: activeFloor.name }))) return
-    run(() => adminDeleteFloor(password, activeFloor.id)).then((ok) => ok && setActiveFloorId(null))
-  }
-
   return (
     <div className="space-y-6">
       <PageTop
@@ -189,7 +148,6 @@ export default function AdminTables() {
       />
 
       <ErrorBanner message={error} onClose={() => setError('')} />
-      {floorsError && <ErrorBanner message={`Floors: ${floorsError}`} onClose={() => setFloorsError('')} />}
 
       {!tables ? (
         <div className="flex justify-center py-32">
@@ -198,7 +156,7 @@ export default function AdminTables() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2.5 sm:gap-4 xl:grid-cols-4">
-            <StatCard icon={<Armchair size={26} />} tone="red" label={t('admin.tables.total')} value={allTables.length} sub={t('admin.tables.inRestaurant')} />
+            <StatCard icon={<Armchair size={26} />} tone="red" label={t('admin.tables.total')} value={floor.length} sub={t('admin.tables.inRestaurant')} />
             <StatCard icon={<UsersRound size={26} />} tone="green" label={t('admin.tables.occupiedTables')} value={count('occupied')} sub={`${pct(count('occupied'))}%`} />
             <StatCard icon={<Clock3 size={26} />} tone="orange" label={t('admin.tables.availableTables')} value={count('available')} sub={`${pct(count('available'))}%`} />
             <StatCard icon={<CircleX size={26} />} tone="gray" label={t('admin.tables.state.out_of_service')} value={count('out_of_service')} sub={`${pct(count('out_of_service'))}%`} />
@@ -217,54 +175,6 @@ export default function AdminTables() {
                     <Plus size={16} /> {t('admin.tables.addTable')}
                   </PrimaryButton>
                 </div>
-              </div>
-
-              {/* One tab per floor ("Ground floor", "Upper floor"...) */}
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                {floors.map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveFloorId(f.id)
-                      setMenu(null)
-                    }}
-                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                      f.id === activeFloor?.id ? 'bg-[#e11d28] text-white' : 'bg-white/[0.06] text-white/75 hover:bg-white/[0.11]'
-                    }`}
-                  >
-                    {f.name} <span className="text-xs opacity-70">({allTables.filter((tb) => floorIdOf(tb) === f.id).length})</span>
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setDialog('addFloor')}
-                  className="flex items-center gap-1 rounded-full border border-dashed border-white/25 px-3 py-1.5 text-xs text-white/75 transition hover:border-white/50 hover:text-white"
-                >
-                  <Plus size={13} /> {t('admin.tables.addFloor')}
-                </button>
-                {activeFloor && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setDialog('renameFloor')}
-                      aria-label={t('admin.tables.renameFloorAria', { name: activeFloor.name })}
-                      className="p-1 text-white/55 transition hover:text-white"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    {floors.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={removeFloor}
-                        aria-label={t('admin.tables.removeFloorAria', { name: activeFloor.name })}
-                        className="p-1 text-white/55 transition hover:text-red-400"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </>
-                )}
               </div>
 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-white/70">
@@ -335,14 +245,6 @@ export default function AdminTables() {
                   {floor.length === 0 && <li className="py-8 text-center text-sm text-white/40">{t('admin.tables.empty')}</li>}
                 </ul>
 
-                {deliveryLink && (
-                  <div className="mt-2 flex items-center gap-3 rounded-xl border border-dashed border-amber-500/30 bg-amber-500/[0.05] px-3 py-3">
-                    <span className="h-3 w-3 rounded-full bg-amber-500" />
-                    <span className="flex-1 text-sm text-white">{t('common.delivery')}</span>
-                    <span className="text-xs text-white/55">{t('admin.tables.inProgress', { count: deliveryLink.openOrders })}</span>
-                  </div>
-                )}
-
                 {homeLink && (
                   <div className="mt-2 flex items-center gap-3 rounded-xl border border-dashed border-amber-500/30 bg-amber-500/[0.05] px-3 py-3">
                     <span className="h-3 w-3 rounded-full bg-amber-500" />
@@ -360,44 +262,19 @@ export default function AdminTables() {
 
       {dialog === 'add' && (
         <AddTableModal
-          nextId={String(Math.max(0, ...allTables.map((tb) => parseInt(tb.id, 10) || 0)) + 1)}
-          floors={floors}
-          initialFloorId={activeFloor?.id}
+          nextId={String(Math.max(0, ...floor.map((tb) => parseInt(tb.id, 10) || 0)) + 1)}
           onClose={() => setDialog(null)}
           onSave={async (table) => {
             const ok = await run(() => adminCreateTable(password, table))
             if (ok) {
               setHighlightId(table.id)
-              setActiveFloorId(table.floorId || activeFloor?.id || null)
               setDialog(null)
             }
           }}
         />
       )}
 
-      {(dialog === 'addFloor' || dialog === 'renameFloor') && (
-        <FloorModal
-          initialName={dialog === 'renameFloor' ? activeFloor?.name : ''}
-          onClose={() => setDialog(null)}
-          onSave={async (name) => {
-            let newId = null
-            const ok = await run(async () => {
-              if (dialog === 'renameFloor') await adminRenameFloor(password, activeFloor.id, name)
-              else newId = (await adminCreateFloor(password, name)).id
-            })
-            if (ok) {
-              if (newId) {
-                // Show the new floor right away, even if the reloaded list was stale.
-                setFloors((prev) => (prev.some((f) => f.id === newId) ? prev : [...prev, { id: newId, name, tables: 0 }]))
-                setActiveFloorId(newId)
-              }
-              setDialog(null)
-            }
-          }}
-        />
-      )}
-
-      {dialog === 'links' && <LinksModal tables={allTables} onClose={() => setDialog(null)} />}
+      {dialog === 'links' && <LinksModal tables={floor} onClose={() => setDialog(null)} />}
     </div>
   )
 }
@@ -759,11 +636,10 @@ function TableMenu({ table, busy, onSeats, onStatus, onRemove, onClose }) {
 /* Dialogs                                                             */
 /* ------------------------------------------------------------------ */
 
-function AddTableModal({ nextId, floors, initialFloorId, onClose, onSave }) {
+function AddTableModal({ nextId, onClose, onSave }) {
   const { t } = useLanguage()
   const [id, setId] = useState(nextId)
   const [seats, setSeats] = useState(4)
-  const [floorId, setFloorId] = useState(initialFloorId || floors[0]?.id || 'ground')
   const [saving, setSaving] = useState(false)
 
   return (
@@ -773,7 +649,7 @@ function AddTableModal({ nextId, floors, initialFloorId, onClose, onSave }) {
         onSubmit={async (event) => {
           event.preventDefault()
           setSaving(true)
-          await onSave({ id: id.trim(), seats: Number(seats) || 4, floorId })
+          await onSave({ id: id.trim(), seats: Number(seats) || 4 })
           setSaving(false)
         }}
       >
@@ -785,46 +661,9 @@ function AddTableModal({ nextId, floors, initialFloorId, onClose, onSave }) {
             <input className="input" type="number" min="1" max="20" value={seats} onChange={(e) => setSeats(e.target.value)} />
           </Field>
         </div>
-        {floors.length > 1 && (
-          <Field label={t('admin.tables.floorField')}>
-            <select className="input" value={floorId} onChange={(e) => setFloorId(e.target.value)}>
-              {floors.map((f) => (
-                <option key={f.id} value={f.id}>{f.name}</option>
-              ))}
-            </select>
-          </Field>
-        )}
         <div className="flex justify-end gap-2 pt-2">
           <GhostButton onClick={onClose}>{t('admin.tables.cancel')}</GhostButton>
           <PrimaryButton type="submit" disabled={saving}>{saving ? t('admin.tables.adding') : t('admin.tables.addButton')}</PrimaryButton>
-        </div>
-      </form>
-    </Modal>
-  )
-}
-
-function FloorModal({ initialName, onClose, onSave }) {
-  const { t } = useLanguage()
-  const [name, setName] = useState(initialName || '')
-  const [saving, setSaving] = useState(false)
-
-  return (
-    <Modal title={initialName ? t('admin.tables.renameFloorTitle') : t('admin.tables.addFloorTitle')} onClose={onClose}>
-      <form
-        className="space-y-4"
-        onSubmit={async (event) => {
-          event.preventDefault()
-          setSaving(true)
-          await onSave(name.trim())
-          setSaving(false)
-        }}
-      >
-        <Field label={t('admin.tables.floorName')}>
-          <input className="input" required maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('admin.tables.floorPlaceholder')} />
-        </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <GhostButton onClick={onClose}>{t('admin.tables.cancel')}</GhostButton>
-          <PrimaryButton type="submit" disabled={saving || !name.trim()}>{t('admin.tables.saveFloor')}</PrimaryButton>
         </div>
       </form>
     </Modal>
@@ -839,8 +678,6 @@ function LinksModal({ tables, onClose }) {
     ...tables.map((tb) => ({ key: tb.id, label: tableLabel(tb.id), path: `/table/${tb.id}` })),
     // The special link, always last: orders to take home (no table).
     { key: 'home', label: 'ToHomeOrder', path: '/ToHomeOrder', special: true },
-    // The delivery link: the customer gives a phone number and an address when confirming.
-    { key: 'delivery', label: 'Delivery', path: '/delivery', special: true, note: 'admin.tables.deliveryOrders' },
   ]
 
   async function copy(row) {
@@ -865,7 +702,7 @@ function LinksModal({ tables, onClose }) {
             <code className="order-last min-w-0 basis-full truncate text-xs text-white/55 sm:order-none sm:flex-1 sm:basis-auto">
               {window.location.origin}{row.path}
             </code>
-            {row.special && <span className="hidden text-[11px] text-amber-400/80 sm:block">{t(row.note || 'admin.tables.noTableOrders')}</span>}
+            {row.special && <span className="hidden text-[11px] text-amber-400/80 sm:block">{t('admin.tables.noTableOrders')}</span>}
             <button type="button" onClick={() => copy(row)} className="ms-auto flex items-center gap-1.5 sm:ms-0 rounded-lg bg-white/[0.07] px-3 py-1.5 text-xs text-white transition hover:bg-white/[0.14]">
               <Copy size={13} /> {copied === row.key ? t('admin.tables.copied') : t('admin.tables.copy')}
             </button>

@@ -55,19 +55,7 @@ export function cleanOrder(raw) {
 
   const number = Number(raw.number)
 
-  // Delivery details are only kept for delivery orders, so every other order
-  // keeps exactly the shape it always had.
-  const delivery =
-    raw.type === 'delivery'
-      ? {
-          type: 'delivery',
-          phone: typeof raw.phone === 'string' ? raw.phone.slice(0, 40) : '',
-          address: typeof raw.address === 'string' ? raw.address.slice(0, 300) : '',
-        }
-      : {}
-
   return {
-    ...delivery,
     id,
     // The "#22" people see. Older servers did not send one: use the id.
     number: Number.isInteger(number) && number > 0 ? number : id,

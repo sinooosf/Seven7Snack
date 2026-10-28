@@ -5,9 +5,6 @@
 //   /table/1 ... /table/N   -> a real table
 //   /ToHomeOrder            -> the special "order without a table" link
 //                              (its id is always "home")
-//   /delivery               -> the delivery link: the customer gives a phone
-//                              number and an address when confirming
-//                              (its id is always "delivery")
 //
 // loadTables() asks the backend which tables exist (during the intro). Two
 // safety nets make a table added from the dashboard work on the first scan
@@ -22,14 +19,8 @@ import { fetchTable, fetchTables } from '../services/api'
 
 export const HOME_TABLE_ID = 'home'
 export const HOME_PATH = '/ToHomeOrder'
-export const DELIVERY_TABLE_ID = 'delivery'
-export const DELIVERY_PATH = '/delivery'
 
-// The links that are not a table: no table to clean, no waiter to call, and
-// every customer only ever sees their own order.
-export const isOpenLink = (id) => String(id) === HOME_TABLE_ID || String(id) === DELIVERY_TABLE_ID
-
-export let VALID_TABLE_IDS = ['1', '2', '3', '4', '5', HOME_TABLE_ID, DELIVERY_TABLE_ID]
+export let VALID_TABLE_IDS = ['1', '2', '3', '4', '5', HOME_TABLE_ID]
 
 function remember(id) {
   if (!VALID_TABLE_IDS.includes(id)) VALID_TABLE_IDS = [...VALID_TABLE_IDS, id]
@@ -39,7 +30,7 @@ export async function loadTables() {
   try {
     const tables = await fetchTables()
     if (Array.isArray(tables) && tables.length) {
-      VALID_TABLE_IDS = [...new Set([...tables.map((table) => String(table.id)), HOME_TABLE_ID, DELIVERY_TABLE_ID])]
+      VALID_TABLE_IDS = [...new Set([...tables.map((table) => String(table.id)), HOME_TABLE_ID])]
     }
   } catch (err) {
     console.warn('Could not load tables from the backend — using the built-in demo tables instead.', err)
@@ -89,7 +80,6 @@ export async function fetchTableAvailability(id) {
 // The id of the table in a customer address, or null.
 export function tableIdFromPath(pathname) {
   if (matchPath({ path: HOME_PATH, end: true }, pathname)) return HOME_TABLE_ID
-  if (matchPath({ path: DELIVERY_PATH, end: true }, pathname)) return DELIVERY_TABLE_ID
   return matchPath('/table/:tableId', pathname)?.params.tableId ?? null
 }
 
@@ -97,11 +87,7 @@ export function tableIdFromPath(pathname) {
 // Pass a translate function (from useLanguage) to get it in the chosen language.
 export function tableLabel(tableId, t) {
   if (t) {
-    if (String(tableId) === HOME_TABLE_ID) return t('common.toHome')
-    if (String(tableId) === DELIVERY_TABLE_ID) return t('common.delivery')
-    return t('common.table', { id: tableId })
+    return String(tableId) === HOME_TABLE_ID ? t('common.toHome') : t('common.table', { id: tableId })
   }
-  if (String(tableId) === HOME_TABLE_ID) return 'To Home'
-  if (String(tableId) === DELIVERY_TABLE_ID) return 'Delivery'
-  return `Table ${tableId}`
+  return String(tableId) === HOME_TABLE_ID ? 'To Home' : `Table ${tableId}`
 }

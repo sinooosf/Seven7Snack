@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { pollWhileVisible } from '../../utils/poll'
 import { useSearchParams } from 'react-router-dom'
 import {
   Check,
@@ -14,7 +13,6 @@ import {
   Printer,
   Search,
   StickyNote,
-  Truck,
   Star,
   UsersRound,
   Zap,
@@ -92,7 +90,8 @@ export default function AdminOrders() {
   useEffect(() => {
     setData(null)
     load()
-    return pollWhileVisible(load, POLL_MS)
+    const timer = setInterval(load, POLL_MS)
+    return () => clearInterval(timer)
   }, [load])
 
   async function changeStatus(order, next) {
@@ -100,20 +99,7 @@ export default function AdminOrders() {
     try {
       const updated = await adminUpdateOrderStatus(password, order.id, next)
       setSelected((current) => (current && current.id === updated.id ? updated : current))
-      // Show the change at once, from the server's answer; the lists are then
-      // refreshed in the background instead of making the click wait for them.
-      setData((current) => {
-        if (!current) return current
-        const before = current.orders.find((o) => o.id === updated.id)
-        const counts = { ...current.counts }
-        if (before && before.status !== updated.status) {
-          counts[before.status] = Math.max(0, (counts[before.status] || 0) - 1)
-          counts[updated.status] = (counts[updated.status] || 0) + 1
-        }
-        return { ...current, counts, orders: current.orders.map((o) => (o.id === updated.id ? updated : o)) }
-      })
-      load()
-      refreshSummary()
+      await Promise.all([load(), refreshSummary()])
     } catch (err) {
       setError(err.message)
     } finally {
@@ -131,18 +117,12 @@ export default function AdminOrders() {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase().replace(/^#/, '')
-    // Phone numbers are compared without spaces/dots/dashes, so "0555 12" finds "0555123456".
-    const digitsOnly = (text) => String(text || '').replace(/[\s.\-()]/g, '')
-    const phoneTerm = digitsOnly(term)
     return (data?.orders || []).filter((order) => {
       if (status !== 'all' && order.status !== status) return false
       if (!term) return true
       return (
         String(orderNumber(order)).includes(term) ||
         orderTableLabel(order, lang).toLowerCase().includes(term) ||
-        // delivery orders can be found by the customer's phone number or address
-        (phoneTerm.length >= 3 && digitsOnly(order.phone).includes(phoneTerm)) ||
-        String(order.address || '').toLowerCase().includes(term) ||
         order.items.some((item) => item.name.toLowerCase().includes(term))
       )
     })
@@ -229,14 +209,6 @@ export default function AdminOrders() {
                       <StatusBadge status={order.status} />
                     </div>
                     <p className="mt-2.5 text-sm text-white/80">{itemsSummary(order, 2, lang)}</p>
-                    {order.type === 'delivery' && (
-                      <p className="mt-1.5 flex items-start gap-1.5 text-xs text-sky-200/90">
-                        <Truck size={13} className="mt-0.5 shrink-0" />
-                        <span className="line-clamp-2 whitespace-pre-line">
-                          <bdi dir="ltr">{order.phone}</bdi> · {order.address}
-                        </span>
-                      </p>
-                    )}
                     {order.note && (
                       <p className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-200/90">
                         <StickyNote size={13} className="mt-0.5 shrink-0" />
@@ -299,9 +271,6 @@ export default function AdminOrders() {
                         <td className="py-3.5 pe-3 font-medium text-white">#{orderNumber(order)}</td>
                         <td className="py-3.5 pe-3"><TablePill tableId={order.tableId} /></td>
                         <td className="truncate py-3.5 pe-3 text-white/85">
-                          {order.type === 'delivery' && (
-                            <Truck size={14} className="me-1.5 inline text-sky-300" title={`${order.phone} · ${order.address}`} aria-label={t('admin.orders.deliveryDetails')} />
-                          )}
                           {order.note && (
                             <StickyNote size={14} className="me-1.5 inline text-amber-300" title={order.note} aria-label={t('admin.orders.clientNote')} />
                           )}
@@ -558,24 +527,6 @@ function OrderModal({ order, busy, onChange, onClose }) {
           </li>
         ))}
       </ul>
-
-      {order.type === 'delivery' && (
-        <div className="mt-4 rounded-xl border border-sky-400/30 bg-sky-400/10 px-4 py-3" data-testid="delivery-details">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-sky-300">
-            <Truck size={14} /> {t('admin.orders.deliveryDetails')}
-          </p>
-          <p className="mt-2 text-xs text-white/55">{t('admin.orders.deliveryPhone')}</p>
-          <a
-            href={`tel:${String(order.phone).replace(/[^\d+]/g, '')}`}
-            aria-label={t('admin.orders.callPhone', { phone: order.phone })}
-            className="text-sm font-semibold text-white underline decoration-white/30 underline-offset-2"
-          >
-            <bdi dir="ltr">{order.phone}</bdi>
-          </a>
-          <p className="mt-2 text-xs text-white/55">{t('admin.orders.deliveryAddress')}</p>
-          <p className="whitespace-pre-line break-words text-sm text-white">{order.address}</p>
-        </div>
-      )}
 
       {order.note && (
         <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3">

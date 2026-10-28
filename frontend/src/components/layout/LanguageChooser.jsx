@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Check } from 'lucide-react'
 import { LANGUAGES, directionOf, translate } from '../../i18n/translate'
 
-// "Choose your language" — shown first, before the menu.
+// "Choose your language" — shown right after the intro, before the menu.
 // Three hexagon flags (English, French, and Arabic shown with the Saudi Arabia flag). Tapping one previews the
 // screen's own text in that language; "Continue" applies it for the whole
 // ordering session (Arabic also flips the layout right-to-left).
