@@ -25,21 +25,13 @@ CREATE TABLE IF NOT EXISTS menu_items (
   sort_order        INTEGER NOT NULL DEFAULT 0
 );
 
--- The floors of the restaurant. Every table sits on one of them.
-CREATE TABLE IF NOT EXISTS restaurant_floors (
-  id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL,
-  sort_order  INTEGER NOT NULL DEFAULT 0
-);
-INSERT INTO restaurant_floors (id, name, sort_order) VALUES ('ground', 'Ground floor', 0)
-  ON CONFLICT (id) DO NOTHING;
+-- (The floors live in ensureFloors() in migrate.js, which runs right after this file.)
 
 -- Named "restaurant_tables" because "table" is a reserved word in SQL.
 CREATE TABLE IF NOT EXISTS restaurant_tables (
   id          TEXT PRIMARY KEY,   -- matches the /table/:id link, e.g. '1'
   label       TEXT NOT NULL,      -- shown in the dashboard, e.g. "Table 1"
   kind        TEXT NOT NULL DEFAULT 'table',  -- 'table' | 'home' (ToHomeOrder link) | 'delivery' (delivery link)
-  floor_key   TEXT NOT NULL DEFAULT 'ground',
   seats       INTEGER NOT NULL DEFAULT 4,
   status      TEXT NOT NULL DEFAULT 'auto',   -- 'auto' | 'cleaning' | 'out_of_service'
   pos_x       REAL,                           -- position on the floor plan, in % (null = automatic)

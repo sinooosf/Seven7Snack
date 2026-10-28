@@ -372,8 +372,8 @@ describe('floors repair themselves', () => {
   it('a missing floors table or column does not break the floors list or adding a floor', async () => {
     const { default: pg } = await import('pg')
     const pool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL })
-    await pool.query('ALTER TABLE restaurant_tables DROP COLUMN IF EXISTS floor_key')
-    await pool.query('DROP TABLE IF EXISTS restaurant_floors CASCADE')
+    await pool.query('ALTER TABLE restaurant_tables DROP COLUMN IF EXISTS dining_floor')
+    await pool.query('DROP TABLE IF EXISTS dining_floors CASCADE')
     const list = await admin('/floors')
     assert.equal(list.status, 200)
     assert.ok(list.body.some((f) => f.id === 'ground'))

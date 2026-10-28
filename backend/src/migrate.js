@@ -17,18 +17,18 @@ export { HOME_TABLE_ID, DELIVERY_TABLE_ID }
 // belongs to one. Existing tables stay on the ground floor. Safe to run any
 // number of times; also called by the floors routes if they find it missing.
 export async function ensureFloors() {
-  // Brand-new names on purpose (restaurant_floors / floor_key, no foreign key):
+  // Brand-new names on purpose (dining_floors / dining_floor, no foreign key):
   // an older version of this feature left a differently-shaped "floors" table and
   // "floor_id" column in some databases, and those must not get in the way.
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS restaurant_floors (
+    CREATE TABLE IF NOT EXISTS dining_floors (
       id          TEXT PRIMARY KEY,
       name        TEXT NOT NULL,
       sort_order  INTEGER NOT NULL DEFAULT 0
     );
-    INSERT INTO restaurant_floors (id, name, sort_order) VALUES ('ground', 'Ground floor', 0)
+    INSERT INTO dining_floors (id, name, sort_order) VALUES ('ground', 'Ground floor', 0)
       ON CONFLICT (id) DO NOTHING;
-    ALTER TABLE restaurant_tables ADD COLUMN IF NOT EXISTS floor_key TEXT NOT NULL DEFAULT 'ground';
+    ALTER TABLE restaurant_tables ADD COLUMN IF NOT EXISTS dining_floor TEXT NOT NULL DEFAULT 'ground';
 
     -- Make the old column (if an older version made one) harmless: nothing reads
     -- it any more, so it must never block adding a table.
