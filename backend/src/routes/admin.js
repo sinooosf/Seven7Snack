@@ -395,7 +395,7 @@ router.delete('/menu-items/:id', async (req, res, next) => {
 // Floors ("Ground floor", "Upper floor"...). Every table sits on one floor;
 // the Tables page shows one floor plan per floor.
 // ---------------------------------------------------------------------
-// If the floors table (or the floor_id column) is missing or incomplete, repair
+// If the floors table (or the floor_key column) is missing or incomplete, repair
 // it and try once more — a floors problem must never break the Tables page.
 async function withFloorsRepair(task) {
   try {
@@ -414,8 +414,8 @@ router.get('/floors', async (req, res, next) => {
       pool.query(
         `SELECT f.id, f.name, f.sort_order,
                 (SELECT COUNT(*)::int FROM restaurant_tables t
-                  WHERE t.floor_id = f.id AND t.kind = 'table') AS tables
-           FROM floors f
+                  WHERE t.floor_key = f.id AND t.kind = 'table') AS tables
+           FROM restaurant_floors f
           ORDER BY f.sort_order ASC, f.id ASC`,
       ),
     )
@@ -443,13 +443,13 @@ router.post('/floors', async (req, res, next) => {
     const result = await withFloorsRepair(async () => {
       let id = base
       for (let attempt = 0; attempt < 5; attempt += 1) {
-        const taken = await pool.query('SELECT 1 FROM floors WHERE id = $1', [id])
+        const taken = await pool.query('SELECT 1 FROM restaurant_floors WHERE id = $1', [id])
         if (taken.rows.length === 0) break
         id = `${base}-${Math.random().toString(16).slice(2, 6)}`
       }
       return pool.query(
-        `INSERT INTO floors (id, name, sort_order)
-         VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM floors)) RETURNING *`,
+        `INSERT INTO restaurant_floors (id, name, sort_order)
+         VALUES ($1, $2, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM restaurant_floors)) RETURNING *`,
         [id, String(name).trim()],
       )
     })
@@ -464,7 +464,7 @@ router.patch('/floors/:id', async (req, res, next) => {
   try {
     const { name } = req.body || {}
     if (!isText(name, 60)) return res.status(400).json({ error: 'A floor needs a name (up to 60 characters).' })
-    const result = await pool.query('UPDATE floors SET name = $1 WHERE id = $2 RETURNING *', [String(name).trim(), req.params.id])
+    const result = await pool.query('UPDATE restaurant_floors SET name = $1 WHERE id = $2 RETURNING *', [String(name).trim(), req.params.id])
     if (result.rows.length === 0) return res.status(404).json({ error: 'Floor not found.' })
     res.json(serializeFloor(result.rows[0]))
   } catch (err) {
@@ -475,15 +475,15 @@ router.patch('/floors/:id', async (req, res, next) => {
 // A floor can only be removed when it has no tables, and the last floor stays.
 router.delete('/floors/:id', async (req, res, next) => {
   try {
-    const count = await pool.query('SELECT COUNT(*)::int AS n FROM floors')
+    const count = await pool.query('SELECT COUNT(*)::int AS n FROM restaurant_floors')
     if (count.rows[0].n <= 1) return res.status(400).json({ error: 'The last floor cannot be removed.' })
 
-    const used = await pool.query('SELECT 1 FROM restaurant_tables WHERE floor_id = $1 AND kind = $2 LIMIT 1', [req.params.id, 'table'])
+    const used = await pool.query('SELECT 1 FROM restaurant_tables WHERE floor_key = $1 AND kind = $2 LIMIT 1', [req.params.id, 'table'])
     if (used.rows.length > 0) {
       return res.status(409).json({ error: 'This floor still has tables. Move or remove them first.' })
     }
 
-    const result = await pool.query('DELETE FROM floors WHERE id = $1 RETURNING id', [req.params.id])
+    const result = await pool.query('DELETE FROM restaurant_floors WHERE id = $1 RETURNING id', [req.params.id])
     if (result.rows.length === 0) return res.status(404).json({ error: 'Floor not found.' })
     res.json({ ok: true })
   } catch (err) {
@@ -580,14 +580,14 @@ router.post('/tables', async (req, res, next) => {
 
     // No floor given -> the first one (the ground floor).
     const floor = floorId
-      ? await pool.query('SELECT id FROM floors WHERE id = $1', [floorId])
-      : await pool.query('SELECT id FROM floors ORDER BY sort_order ASC, id ASC LIMIT 1')
+      ? await pool.query('SELECT id FROM restaurant_floors WHERE id = $1', [floorId])
+      : await pool.query('SELECT id FROM restaurant_floors ORDER BY sort_order ASC, id ASC LIMIT 1')
     if (floor.rows.length === 0) return res.status(400).json({ error: 'That floor does not exist.' })
 
     const seatCount = Math.min(Math.max(Math.trunc(Number(seats)) || 4, 1), 20)
 
     const result = await pool.query(
-      'INSERT INTO restaurant_tables (id, label, seats, floor_id) VALUES ($1, $2, $3, $4) RETURNING *',
+      'INSERT INTO restaurant_tables (id, label, seats, floor_key) VALUES ($1, $2, $3, $4) RETURNING *',
       [cleanId, String(label || '').trim() || `Table ${cleanId}`, seatCount, floor.rows[0].id],
     )
     res.status(201).json(serializeTable(result.rows[0]))
@@ -606,6 +606,10 @@ router.patch('/tables/:id', async (req, res, next) => {
     const { seats, label, status, posX, posY, floorId } = req.body || {}
     if (floorId !== undefined && floorId !== null && !isText(floorId, 80)) {
       return res.status(400).json({ error: 'That floor does not exist.' })
+    }
+    if (floorId !== undefined && floorId !== null) {
+      const known = await pool.query('SELECT 1 FROM restaurant_floors WHERE id = $1', [floorId])
+      if (known.rows.length === 0) return res.status(400).json({ error: 'That floor does not exist.' })
     }
     if (label !== undefined && label !== null && !isText(label, 60)) {
       return res.status(400).json({ error: 'The label must be 1–60 characters.' })
@@ -626,9 +630,9 @@ router.patch('/tables/:id', async (req, res, next) => {
          label  = COALESCE($2, label),
          status = COALESCE($3, status),
          -- moving to another floor puts the table back on the automatic grid there
-         pos_x  = CASE WHEN $7::text IS NOT NULL AND $7::text <> floor_id THEN NULL ELSE COALESCE($5, pos_x) END,
-         pos_y  = CASE WHEN $7::text IS NOT NULL AND $7::text <> floor_id THEN NULL ELSE COALESCE($6, pos_y) END,
-         floor_id = COALESCE($7::text, floor_id)
+         pos_x  = CASE WHEN $7::text IS NOT NULL AND $7::text <> floor_key THEN NULL ELSE COALESCE($5, pos_x) END,
+         pos_y  = CASE WHEN $7::text IS NOT NULL AND $7::text <> floor_key THEN NULL ELSE COALESCE($6, pos_y) END,
+         floor_key = COALESCE($7::text, floor_key)
        WHERE id = $4 AND kind = 'table'
        RETURNING *`,
       [seatCount, (typeof label === 'string' ? label.trim() : '') || null, status ?? null, req.params.id, pct(posX), pct(posY), floorId ?? null],

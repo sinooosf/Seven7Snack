@@ -17,19 +17,30 @@ export { HOME_TABLE_ID, DELIVERY_TABLE_ID }
 // belongs to one. Existing tables stay on the ground floor. Safe to run any
 // number of times; also called by the floors routes if they find it missing.
 export async function ensureFloors() {
+  // Brand-new names on purpose (restaurant_floors / floor_key, no foreign key):
+  // an older version of this feature left a differently-shaped "floors" table and
+  // "floor_id" column in some databases, and those must not get in the way.
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS floors (
+    CREATE TABLE IF NOT EXISTS restaurant_floors (
       id          TEXT PRIMARY KEY,
       name        TEXT NOT NULL,
       sort_order  INTEGER NOT NULL DEFAULT 0
     );
-    -- A floors table made by an older/partial version gets what it lacks.
-    ALTER TABLE floors ADD COLUMN IF NOT EXISTS name       TEXT    NOT NULL DEFAULT 'Floor';
-    ALTER TABLE floors ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
-    INSERT INTO floors (id, name, sort_order) VALUES ('ground', 'Ground floor', 0)
+    INSERT INTO restaurant_floors (id, name, sort_order) VALUES ('ground', 'Ground floor', 0)
       ON CONFLICT (id) DO NOTHING;
-    ALTER TABLE restaurant_tables
-      ADD COLUMN IF NOT EXISTS floor_id TEXT NOT NULL DEFAULT 'ground' REFERENCES floors(id);
+    ALTER TABLE restaurant_tables ADD COLUMN IF NOT EXISTS floor_key TEXT NOT NULL DEFAULT 'ground';
+
+    -- Make the old column (if an older version made one) harmless: nothing reads
+    -- it any more, so it must never block adding a table.
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_name = 'restaurant_tables' AND column_name = 'floor_id') THEN
+        ALTER TABLE restaurant_tables ALTER COLUMN floor_id DROP NOT NULL;
+        ALTER TABLE restaurant_tables ALTER COLUMN floor_id DROP DEFAULT;
+      END IF;
+    EXCEPTION WHEN others THEN NULL;
+    END $$;
   `)
 }
 
